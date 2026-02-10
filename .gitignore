@@ -1,0 +1,38 @@
+# Binaries
+dist/
+*.exe
+aurumflow
+aurumflow.exe
+
+# Config with secrets (keep config.json.example if needed)
+# config/config.json
+
+# Go
+vendor/
+*.test
+*.out
+coverage.html
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs (per-run files)
+logs/
+
+# Env
+.env
+.env.local
+*.local
+
+/backtesting
+/bk_backtesting
+/bots
+/config/config.json
+/scripts
+/.cursor
+/logs
+AurumFlow.md

@@ -1,0 +1,83 @@
+{
+  "api": {
+    "mode": "live",
+    "api_base_url": "https://api-capital.backend-capital.com",
+    "api_key": "",
+    "identifier": "",
+    "password": "",
+    "account_id": "",
+    "max_spread": 0
+  },
+  "risk": {
+    "risk_per_trade": 2.5,
+    "max_trades": 3,
+    "daily_drawdown_limit": 5
+  },
+  "indicators": {
+    "rsi_period": 9,
+    "atr_period": 14,
+    "min_atr": 7,
+    "max_atr": 55
+  },
+  "strategy": {
+    "entry_delay_candles": 1,
+    "swing_lookback": 5,
+    "score_threshold": 7,
+    "rsi_required": false,
+    "rsi_mode": "BOOST",
+    "rsi_buy_low": 35,
+    "rsi_buy_high": 50,
+    "rsi_sell_low": 50,
+    "rsi_sell_high": 65,
+    "sweep_close_tolerance": 0.2,
+    "sweep_min_penetration": 0.12,
+    "sweep_min_wick_ratio": 1.4,
+    "sweep_debug_log": true,
+    "trading_sessions": ["ALL"],
+    "block_london_ny_overlap": false,
+    "use_h4_filter": true,
+    "use_h1_filter": false,
+    "block_h4_range": true,
+    "block_h1_range": true,
+    "crypto": false,
+    "h1_range_extra_score": 0,
+    "h4_swing_lookback": 12,
+    "h1_swing_lookback": 8,
+    "state_ttl_candles": 18,
+    "use_break_even": false,
+    "break_even_r": 1.0
+  },
+  "timeframes": {
+    "h4": "HOUR_4",
+    "h1": "HOUR",
+    "m15": "MINUTE_15",
+    "m5": "MINUTE_5"
+  },
+  "data_quality": {
+    "max_age_m15_minutes": 20,
+    "max_age_h1_minutes": 75,
+    "max_age_h4_minutes": 300,
+    "reopen_warmup_m15_candles": 3,
+    "block_on_data_frozen": true
+  },
+  "notifications": {
+    "enabled": true,
+    "provider": "pushover",
+    "pushover": {
+      "api_url": "https://api.pushover.net/1/messages.json",
+      "token": "",
+      "user": ""
+    },
+    "telegram": {
+      "enabled": true,
+      "bot_token": "",
+      "chat_id": "",
+      "parse_mode": "HTML",
+      "events": [],
+      "include_market_context": true,
+      "fail_policy": "best_effort",
+      "rate_limit_per_min": 0
+    },
+    "queue_cap": 100
+  }
+}
