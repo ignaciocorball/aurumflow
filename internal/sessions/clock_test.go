@@ -23,4 +23,13 @@ func TestPhaseAndHandoff(t *testing.T) {
 	if !ok || h.Event == "" {
 		t.Fatal(h, ok)
 	}
+	if MarketHours("US100", "CLOSED", us) != MarketClosed {
+		t.Fatal("broker status must win")
+	}
+	if MarketHours("US100", "TRADEABLE", us) != MarketOpen {
+		t.Fatal("tradeable")
+	}
+	if MarketHours("BTC", "", asia) != MarketOpen {
+		t.Fatal("btc")
+	}
 }

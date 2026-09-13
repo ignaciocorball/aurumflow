@@ -75,6 +75,7 @@ func AttachOpportunity(ws worldstate.WorldState, ranks []opportunity.Ranked) wor
 		st := r.State
 		st.Attention = r.Score
 		st.Coverage = r.Coverage
+		st.Tier = string(r.Tier)
 		ws.Opportunity = append(ws.Opportunity, st)
 	}
 	return ws

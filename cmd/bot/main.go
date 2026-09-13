@@ -74,6 +74,7 @@ func main() {
 	globalShadow := flag.Bool("global-shadow", false, "multi-market SHADOW proposals from official WorldState (no orders)")
 	prepareMarket := flag.String("prepare-market", "", "READ-ONLY Capital discovery/spec for a canonical market")
 	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
+	prepareUniverse := flag.Bool("prepare-demo-universe", false, "READ-ONLY prepare matrix for all resolved Capital markets (no orders)")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -139,6 +140,10 @@ func main() {
 	}
 	if *calibrateMarket != "" {
 		runPrepareMarket(context.Background(), *calibrateMarket, true)
+		return
+	}
+	if *prepareUniverse {
+		runPrepareDemoUniverse(context.Background())
 		return
 	}
 	if *prepareMarket != "" {

@@ -96,9 +96,11 @@ const (
 	ModeLive    SourceMode = "LIVE_OFFICIAL"
 	ModeCache   SourceMode = "CACHE_OFFICIAL"
 
-	SetupNone      SetupState = "NONE"
-	SetupPotential SetupState = "POTENTIAL"
-	SetupBlocked   SetupState = "BLOCKED"
+	SetupNone         SetupState = "NONE"
+	SetupPotential    SetupState = "POTENTIAL"
+	SetupBlocked      SetupState = "BLOCKED"
+	SetupNoSetup      SetupState = "NO_SETUP"
+	SetupInsufficient SetupState = "INSUFFICIENT_DATA"
 )
 
 type ContextObservation struct {

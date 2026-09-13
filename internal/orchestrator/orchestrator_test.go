@@ -24,12 +24,18 @@ func TestOrchestratorNoBrokerMutation(t *testing.T) {
 			t.Fatal("field")
 		}
 	}
-	p := d.Propose(worldstate.WorldState{Confidence: 0.7}, opportunity.Ranked{
+	p := d.Propose(worldstate.WorldState{Confidence: 0.75, Hash: "abc"}, opportunity.Ranked{
 		Market: "GOLD", Score: 80,
-		State: worldstate.MarketState{Market: "GOLD", PriceTrend: "UP", Eligibility: worlddomain.EligNotCalibrated, DataQuality: worlddomain.HealthHealthy},
+		State: worldstate.MarketState{Market: "GOLD", PriceTrend: "UP", Eligibility: worlddomain.EligDiscovered, DataQuality: worlddomain.HealthHealthy},
 	}, "", "")
 	if p.Eligibility == worlddomain.EligDemo || p.Direction == "" {
 		t.Fatal(p)
+	}
+	if p.ConfidenceKind != "UNKNOWN" || p.Confidence != 0 {
+		t.Fatalf("arbitrary confidence: %+v", p)
+	}
+	if p.WorldHash != "abc" {
+		t.Fatal(p.WorldHash)
 	}
 	if p.Setup == worlddomain.SetupPotential && p.Eligibility == worlddomain.EligDemo {
 		t.Fatal("collapsed")
@@ -44,7 +50,7 @@ func TestAttentionSetupCandidateNotOrder(t *testing.T) {
 	if watch.Decision != "WATCH" || watch.Setup == worlddomain.SetupPotential {
 		t.Fatalf("attention became setup: %+v", watch)
 	}
-	setup := d.ProposeFull(ws, r, "LONG", "", worlddomain.EligNotCalibrated, nil)
+	setup := d.ProposeFull(ws, r, "LONG", "", worlddomain.EligDiscovered, nil)
 	if setup.Decision != "BLOCKED" || setup.Setup != worlddomain.SetupPotential {
 		t.Fatalf("setup collapsed: %+v", setup)
 	}
@@ -54,5 +60,15 @@ func TestAttentionSetupCandidateNotOrder(t *testing.T) {
 	}
 	if d.CanMutateBroker() {
 		t.Fatal("order")
+	}
+}
+
+func TestDuplicateBlockersRemoved(t *testing.T) {
+	d := New()
+	p := d.ProposeFull(worldstate.WorldState{Hash: "h"}, opportunity.Ranked{
+		Market: "GOLD", State: worldstate.MarketState{Market: "GOLD", Eligibility: worlddomain.EligDiscovered},
+	}, "", "", worlddomain.EligDiscovered, []string{"unknown monetary risk blocks new order", "unknown monetary risk blocks new order"})
+	if len(p.PortfolioBlocks) != 1 {
+		t.Fatal(p.PortfolioBlocks)
 	}
 }

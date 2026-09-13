@@ -1,6 +1,6 @@
 {
-  "as_of": "2026-09-13T20:16:08.954463Z",
-  "blocked": 4,
+  "as_of": "2026-09-13T20:33:33.7894552Z",
+  "blocked": 17,
   "broker_mutation": false,
   "demo_candidate": 0,
   "fetch": [
@@ -12,7 +12,7 @@
       "Latest": "2026-09-10T00:00:00Z",
       "Error": "",
       "URL": "https://www.federalreserve.gov/releases/h41/current/h41.htm",
-      "Hash": "3f1b552f16e16cdf7c4fba909a2a74a7e20539fa26bd66e8f47c0e3d07a2e73d"
+      "Hash": "68eda7921c253f0b9d38d77f6d3b6ad685913d6a1eac90e892801462a795d18e"
     },
     {
       "Provider": "TIC",
@@ -125,31 +125,60 @@
       "Hash": ""
     }
   ],
-  "markets_analyzed": 4,
+  "hash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+  "markets_analyzed": 17,
   "multi_market_demo": false,
   "proposals": [
+    {
+      "Market": "BTC",
+      "Direction": "NONE",
+      "AttentionScore": 45,
+      "Coverage": 50,
+      "EvidenceConfidence": 0.5,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "FLAT",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
     {
       "Market": "GOLD",
       "Direction": "NONE",
       "AttentionScore": 15,
       "Coverage": 12.5,
+      "EvidenceConfidence": 0.125,
       "Macro": "UNKNOWN",
       "CapitalFlow": "UNKNOWN",
       "Positioning": "CFTC managed-money observed",
       "CrossAsset": "UNKNOWN",
       "Legacy": "",
       "Microstructure": "UNAVAILABLE",
-      "Confidence": 0.75,
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
       "Blocking": [
         "DEMO_DISCOVERED",
         "data_quality",
-        "no_legacy_setup"
+        "insufficient_legacy_data"
       ],
       "PortfolioBlocks": [
-        "unknown monetary risk blocks new order",
         "unknown monetary risk blocks new order"
       ],
-      "Setup": "NONE",
+      "Setup": "INSUFFICIENT_DATA",
       "Eligibility": "DEMO_DISCOVERED",
       "Decision": "BLOCKED"
     },
@@ -158,48 +187,79 @@
       "Direction": "NONE",
       "AttentionScore": 15,
       "Coverage": 12.5,
+      "EvidenceConfidence": 0.125,
       "Macro": "UNKNOWN",
       "CapitalFlow": "UNKNOWN",
       "Positioning": "CFTC silver observed",
       "CrossAsset": "UNKNOWN",
       "Legacy": "",
       "Microstructure": "UNAVAILABLE",
-      "Confidence": 0.75,
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
       "Blocking": [
         "DEMO_DISCOVERED",
         "data_quality",
-        "no_legacy_setup"
+        "insufficient_legacy_data"
       ],
       "PortfolioBlocks": [
-        "unknown monetary risk blocks new order",
         "unknown monetary risk blocks new order"
       ],
-      "Setup": "NONE",
+      "Setup": "INSUFFICIENT_DATA",
       "Eligibility": "DEMO_DISCOVERED",
       "Decision": "BLOCKED"
     },
     {
-      "Market": "BTC",
+      "Market": "AAPL",
       "Direction": "NONE",
       "AttentionScore": 0,
       "Coverage": 0,
+      "EvidenceConfidence": 0,
       "Macro": "UNKNOWN",
       "CapitalFlow": "UNKNOWN",
       "Positioning": "UNKNOWN",
       "CrossAsset": "UNKNOWN",
       "Legacy": "",
       "Microstructure": "UNAVAILABLE",
-      "Confidence": 0.75,
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
       "Blocking": [
         "DEMO_DISCOVERED",
         "data_quality",
-        "no_legacy_setup"
+        "insufficient_legacy_data"
       ],
       "PortfolioBlocks": [
-        "unknown monetary risk blocks new order",
         "unknown monetary risk blocks new order"
       ],
-      "Setup": "NONE",
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "AMZN",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
       "Eligibility": "DEMO_DISCOVERED",
       "Decision": "BLOCKED"
     },
@@ -208,27 +268,327 @@
       "Direction": "NONE",
       "AttentionScore": 0,
       "Coverage": 0,
+      "EvidenceConfidence": 0,
       "Macro": "UNKNOWN",
       "CapitalFlow": "PENDING_PUBLIC_STRUCTURED_SOURCE",
       "Positioning": "UNKNOWN",
       "CrossAsset": "UNKNOWN",
       "Legacy": "",
       "Microstructure": "UNAVAILABLE",
-      "Confidence": 0.75,
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "CN50",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "PENDING_PUBLIC_STRUCTURED_SOURCE",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "DE40",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "J225",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "META",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "MSFT",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "NVDA",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "OIL_CRUDE",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "UK100",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "US100",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "US30",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
+      "Blocking": [
+        "DEMO_DISCOVERED",
+        "data_quality",
+        "insufficient_legacy_data"
+      ],
+      "PortfolioBlocks": [
+        "unknown monetary risk blocks new order"
+      ],
+      "Setup": "INSUFFICIENT_DATA",
+      "Eligibility": "DEMO_DISCOVERED",
+      "Decision": "BLOCKED"
+    },
+    {
+      "Market": "US500",
+      "Direction": "NONE",
+      "AttentionScore": 0,
+      "Coverage": 0,
+      "EvidenceConfidence": 0,
+      "Macro": "UNKNOWN",
+      "CapitalFlow": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "Legacy": "",
+      "Microstructure": "UNAVAILABLE",
+      "Confidence": 0,
+      "ConfidenceKind": "UNKNOWN",
+      "WorldHash": "3b2bade8544c2cf7f0f6eb6fa4d184073964532308e343df04572944d3ea019f",
       "Blocking": [
         "ANALYSIS_ONLY",
         "data_quality",
-        "no_legacy_setup"
+        "insufficient_legacy_data"
       ],
       "PortfolioBlocks": [
-        "unknown monetary risk blocks new order",
         "unknown monetary risk blocks new order"
       ],
-      "Setup": "NONE",
+      "Setup": "INSUFFICIENT_DATA",
       "Eligibility": "ANALYSIS_ONLY",
       "Decision": "BLOCKED"
     }
   ],
+  "risk_unit": "account_currency_risk",
   "setup": 0,
   "valid": "CURRENT_WORLD_STATE_VALID",
   "watch": 0

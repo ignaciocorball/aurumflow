@@ -25,7 +25,8 @@ type Ranked struct {
 	Market               string
 	Score                float64
 	Coverage             float64
-	CoverageConfidence   float64
+	CoverageConfidence   float64 // deprecated alias of EvidenceConfidence; not a probability
+	EvidenceConfidence   float64 // Coverage/100: fraction of observed components
 	Tier                 worlddomain.AttentionTier
 	State                worldstate.MarketState
 	Why                  []string
@@ -68,8 +69,10 @@ func Score(st worldstate.MarketState, ws worldstate.WorldState) Ranked {
 		risks = append(risks, "not DEMO_ELIGIBLE")
 	}
 	cov := CoverageScore(st)
+	ev := cov / 100
 	return Ranked{
-		Market: st.Market, Score: sum, Coverage: cov, CoverageConfidence: sum * cov / 100,
+		Market: st.Market, Score: sum, Coverage: cov,
+		CoverageConfidence: ev, EvidenceConfidence: ev,
 		Tier: tier(sum), State: st,
 		Why: why, Risks: risks, Freshness: freshness(st), Components: c,
 	}
@@ -92,7 +95,7 @@ func CoverageScore(st worldstate.MarketState) float64 {
 	}
 	check(st.Positioning)
 	check(st.RelativeStrength)
-	if st.PriceTrend == "UP" || st.PriceTrend == "DOWN" {
+	if momBonus(st.PriceTrend) > 0 {
 		n++
 		known++
 	} else {
@@ -116,7 +119,8 @@ func CoverageScore(st worldstate.MarketState) float64 {
 func Rank(ws worldstate.WorldState) []Ranked {
 	var out []Ranked
 	for _, st := range ws.Markets {
-		if st.DataQuality == worlddomain.HealthUnknown && len(st.Evidence) == 0 && st.CapitalFlowContext == "UNKNOWN" && st.Positioning == "UNKNOWN" && st.MacroAlignment == "UNKNOWN" && st.PriceTrend == "UNKNOWN" {
+		empty := st.DataQuality == worlddomain.HealthUnknown && len(st.Evidence) == 0 && st.CapitalFlowContext == "UNKNOWN" && st.Positioning == "UNKNOWN" && st.MacroAlignment == "UNKNOWN" && st.PriceTrend == "UNKNOWN"
+		if empty && !st.Resolved {
 			continue
 		}
 		out = append(out, Score(st, ws))
@@ -165,10 +169,12 @@ func flowBonus(s string) float64 {
 }
 
 func momBonus(s string) float64 {
-	if s == "UP" || s == "DOWN" {
+	switch s {
+	case "UP", "DOWN", "STRONG_UP", "STRONG_DOWN", "FLAT":
 		return 1
+	default:
+		return 0
 	}
-	return 0
 }
 
 func freshness(st worldstate.MarketState) worlddomain.Frequency {

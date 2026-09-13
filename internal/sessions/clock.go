@@ -1,6 +1,9 @@
 package sessions
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Phase string
 
@@ -86,4 +89,58 @@ func Handoff(prev, cur Phase, t time.Time) (HandoffSnapshot, bool) {
 		ev = "US close"
 	}
 	return HandoffSnapshot{At: t.UTC(), Phase: cur, Event: ev, Note: "descriptive session handoff, no causality"}, true
+}
+
+const (
+	MarketPreopen = "PREOPEN"
+	MarketOpen    = "OPEN"
+	MarketClosed  = "CLOSED"
+	MarketUnknown = "UNKNOWN"
+)
+
+// MarketHours is descriptive clock state. Broker marketStatus remains authoritative for execution.
+func MarketHours(canonical string, brokerStatus string, t time.Time) string {
+	switch strings.ToUpper(strings.TrimSpace(brokerStatus)) {
+	case "TRADEABLE", "OPEN", "ON":
+		return MarketOpen
+	case "CLOSED", "OFFLINE":
+		return MarketClosed
+	}
+	if strings.EqualFold(canonical, "BTC") {
+		return MarketOpen
+	}
+	h := t.UTC().Hour()
+	switch strings.ToUpper(canonical) {
+	case "J225", "CN50", "CHINA_HK", "HK":
+		if h >= 0 && h < 8 {
+			return MarketOpen
+		}
+		if h >= 23 {
+			return MarketPreopen
+		}
+		return MarketClosed
+	case "DE40", "UK100", "EUROPE", "UK":
+		if h >= 7 && h < 16 {
+			return MarketOpen
+		}
+		if h >= 6 && h < 7 {
+			return MarketPreopen
+		}
+		return MarketClosed
+	case "US100", "US500", "US30", "AAPL", "MSFT", "NVDA", "META", "AMZN":
+		if h >= 13 && h < 21 {
+			return MarketOpen
+		}
+		if h >= 12 && h < 13 {
+			return MarketPreopen
+		}
+		return MarketClosed
+	case "GOLD", "SILVER", "OIL", "OIL_CRUDE":
+		if h >= 22 || h < 21 {
+			return MarketOpen
+		}
+		return MarketClosed
+	default:
+		return MarketUnknown
+	}
 }

@@ -109,6 +109,32 @@ canvas{width:100%;display:block;background:#0d1219}
     <div class="note" id="truth">Official origin: WAITING</div>
   </section>
   <section class="box">
+    <h2>WORLD MARKET TAPE</h2>
+    <div class="note">Live Capital price plane. CLOSED / STALE quotes are not current momentum.</div>
+    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>Attention</th><th>Coverage</th><th>Tier</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section class="box">
+    <h2>GLOBAL HEATMAP</h2>
+    <div class="note">ASIA · EUROPE · US · COMMODITIES · CRYPTO. UNKNOWN stays gray.</div>
+    <div class="map" id="hmap">
+      <div class="reg" id="hm-asia"><span class="dot"></span><b>ASIA</b><span id="hv-asia">UNKNOWN</span></div>
+      <div class="reg" id="hm-eu"><span class="dot"></span><b>EUROPE</b><span id="hv-eu">UNKNOWN</span></div>
+      <div class="reg" id="hm-us"><span class="dot"></span><b>US</b><span id="hv-us">UNKNOWN</span></div>
+      <div class="reg" id="hm-com"><span class="dot"></span><b>COMMODITIES</b><span id="hv-com">UNKNOWN</span></div>
+      <div class="reg" id="hm-cry"><span class="dot"></span><b>CRYPTO</b><span id="hv-cry">UNKNOWN</span></div>
+    </div>
+  </section>
+  <section class="box">
+    <h2>GLOBAL ROTATION</h2>
+    <div class="note">PRICE LEADERSHIP — not capital flow. Do not infer flows from price alone.</div>
+    <div class="kv" id="rotkv"></div>
+  </section>
+  <section class="box">
+    <h2>CAPITAL FLOW EVIDENCE</h2>
+    <div class="note">Official slow context only. Separate from PRICE LEADERSHIP.</div>
+    <div id="flowev" class="kv"></div>
+  </section>
+  <section class="box">
     <h2>Official sources</h2>
     <div class="note">LIVE OFFICIAL · CACHED OFFICIAL · UNKNOWN. Fixtures never appear here.</div>
     <table class="heat" id="srctab"><thead><tr><th>Source</th><th>Latest published</th><th>Latest observation</th><th>Retrieved</th><th>Freshness</th><th>Origin</th><th>Status</th></tr></thead><tbody></tbody></table>
@@ -134,6 +160,7 @@ canvas{width:100%;display:block;background:#0d1219}
   </section>
   <section class="box">
     <h2>Capital flow</h2>
+    <div class="note">CAPITAL FLOW EVIDENCE (official) vs PRICE LEADERSHIP (live tape) stay separate.</div>
     <div id="flows" class="kv"></div>
   </section>
   <section class="box">
@@ -606,7 +633,8 @@ function paintWorld(w){
     ['Risk', w.Risk||'—'],
     ['USD', w.USD&&w.USD.USD?w.USD.USD:'—'],
     ['Session', w.Session||'—'],
-    ['Confidence', w.Confidence==null?'—':String(w.Confidence)],
+    ['Official completeness', w.Confidence==null?'—':String(w.Confidence)],
+    ['World hash', w.Hash||'—'],
     ['World valid', w.Valid||'—']
   ]);
   el('truth').textContent='Official origin: '+(w.Origins&&w.Origins.length?w.Origins.join(', '):'UNKNOWN')+' · '+ (w.Valid||'WAITING');
@@ -635,13 +663,73 @@ function paintWorld(w){
     var tr=document.createElement('tr');
     tr.innerHTML='<td>'+(i+1)+'</td><td>'+m.Market+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Setup||'NONE')+'</td><td>'+cell(m.MacroAlignment)+'</td><td>'+cell(m.CapitalFlowContext)+'</td><td>'+cell(m.Positioning)+'</td><td>'+(m.MicroAvailable?'ready':'unavailable')+'</td><td>'+(m.Eligibility||m.EligReason||'ANALYSIS_ONLY')+'</td><td>'+(m.Proposal||'WATCH')+'</td>';
     tr.onclick=function(){
-      el('odetail').textContent='WHY '+m.Market+'\n'+((m.Evidence||[]).join('\n'))+'\nBLOCKED: '+(m.EligReason||'none');
+      var live=w.Live&&w.Live.Features?w.Live.Features[m.Market]:null;
+      el('odetail').textContent='WHY '+m.Market+
+        '\nLive price '+(m.Mid||'—')+' session '+(m.SessionLocal||'—')+
+        '\nMomentum '+(m.PriceTrend||'—')+' vol '+(m.Volatility||'—')+' RS '+(m.RelativeStrength||'—')+
+        '\nMacro '+(m.MacroAlignment||'—')+' flow '+(m.CapitalFlowContext||'—')+' pos '+(m.Positioning||'—')+
+        '\nLegacy '+(m.Setup||'NONE')+' micro '+(m.MicroAvailable?'available (sensing only)':'unavailable')+
+        '\nEligibility '+(m.Eligibility||'ANALYSIS_ONLY')+
+        '\n'+(m.SourceBadge||'UNKNOWN')+
+        '\n'+((m.Evidence||[]).join('\n'))+
+        (live?'\n15m/1h/4h live features present':'');
     };
     ot.appendChild(tr);
   });
+  paintTape(w);
+  paintHeatLive(w);
+  paintRotation(w);
   var fl=w.Flows||[];
   kv('flows', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')+' '+((f.Strength||0))]}));
+  kv('flowev', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')]}));
   el('gtl').textContent='Session '+ (w.Session||'WAITING') +' · Tokyo → Hong Kong → London → New York';
+}
+function mget(w,id){return (w.Markets&&w.Markets[id])||{}}
+function feat(w,id){return (w.Live&&w.Live.Features&&w.Live.Features[id])||{}}
+function pct(v){if(!isNum(v)) return '—'; return (v*100).toFixed(2)+'%'}
+function paintTape(w){
+  var ids=['US100','US500','US30','GOLD','SILVER','OIL_CRUDE','DE40','UK100','J225','CN50','BTC'];
+  var tb=document.querySelector('#tape tbody'); if(!tb) return; tb.innerHTML='';
+  var opp={};
+  (w.Opportunity||[]).forEach(function(m){opp[m.Market]=m});
+  ids.forEach(function(id){
+    var m=Object.assign({},mget(w,id),opp[id]||{});
+    var f=feat(w,id);
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+id+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid),m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Tier||'—')+'</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
+    tb.appendChild(tr);
+  });
+}
+function heatWord(v){
+  v=String(v||'UNKNOWN').toUpperCase();
+  if(v==='UNKNOWN'||v===''||v==='STALE'||v==='CLOSED') return {t:'UNKNOWN',c:'unk'};
+  if(v.indexOf('UP')>=0||v==='EXPANDING'||v==='STRONG_BROAD'||v==='BROAD') return {t:v,c:'pos'};
+  if(v.indexOf('DOWN')>=0||v==='CONTRACTING'||v==='NEGATIVE') return {t:v,c:'neg'};
+  return {t:v,c:'mix'};
+}
+function setHM(id,val){
+  var x=heatWord(val); var n=el(id); if(!n) return;
+  n.textContent=x.t; n.className=x.c;
+}
+function paintHeatLive(w){
+  var M=w.Markets||{};
+  setHM('hv-asia', (M.J225&&M.J225.PriceTrend)||'UNKNOWN');
+  setHM('hv-eu', (M.DE40&&M.DE40.PriceTrend)||'UNKNOWN');
+  setHM('hv-us', (M.US100&&M.US100.PriceTrend)||'UNKNOWN');
+  setHM('hv-com', (M.GOLD&&M.GOLD.PriceTrend)||'UNKNOWN');
+  setHM('hv-cry', (M.BTC&&M.BTC.PriceTrend)||'UNKNOWN');
+}
+function paintRotation(w){
+  var L=w.Live||{};
+  kv('rotkv',[
+    ['US equity', (L.Breadth&&L.Breadth.State)||'UNKNOWN'],
+    ['Europe equity', (L.Europe&&L.Europe.Leadership)||'UNKNOWN'],
+    ['Asia equity', (L.Asia&&L.Asia.Leadership)||'UNKNOWN'],
+    ['Precious metals', (L.Precious&&L.Precious.GoldRS)||'UNKNOWN'],
+    ['Energy', (L.Energy&&L.Energy.OilMomentum)||'UNKNOWN'],
+    ['Crypto', (mget(w,'BTC').PriceTrend)||'UNKNOWN'],
+    ['Label', 'PRICE LEADERSHIP']
+  ]);
 }
 function paintSources(j){
   if(!j) return;

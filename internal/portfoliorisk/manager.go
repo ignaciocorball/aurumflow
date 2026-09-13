@@ -1,14 +1,23 @@
 package portfoliorisk
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 const (
-	GroupUSEquity   = "US_EQUITY_INDEX"
-	GroupPrecious   = "PRECIOUS_METALS"
-	GroupEnergy     = "ENERGY"
-	GroupEurope     = "EUROPE_EQUITY"
-	GroupAsia       = "ASIA_EQUITY"
-	GroupCrypto     = "CRYPTO"
+	GroupUSEquity = "US_EQUITY_INDEX"
+	GroupPrecious = "PRECIOUS_METALS"
+	GroupEnergy   = "ENERGY"
+	GroupEurope   = "EUROPE_EQUITY"
+	GroupAsia     = "ASIA_EQUITY"
+	GroupCrypto   = "CRYPTO"
+
+	// RiskUnit is account-currency risk: expected loss if each position hits its
+	// configured stop, measured in the DEMO account currency (typically USD).
+	// Caps below are therefore account-currency risk budgets, not dimensionless counts
+	// and not notional exposure.
+	RiskUnit = "account_currency_risk"
 )
 
 type Caps struct {
@@ -17,6 +26,7 @@ type Caps struct {
 	MaxAggregateRisk     float64
 	MaxRiskPerRegion     float64
 	MaxRiskPerAssetClass float64
+	Unit                 string
 }
 
 func ConservativeCaps() Caps {
@@ -26,6 +36,7 @@ func ConservativeCaps() Caps {
 		MaxAggregateRisk:     300,
 		MaxRiskPerRegion:     150,
 		MaxRiskPerAssetClass: 150,
+		Unit:                 RiskUnit,
 	}
 }
 
@@ -38,14 +49,19 @@ type Position struct {
 }
 
 type Result struct {
-	Pass             bool
-	Blocks           []string
-	GrossRisk        float64
-	ByAsset          map[string]float64
-	ByRegion         map[string]float64
-	ByGroup          map[string]float64
-	OpenPositions    int
-	CorrelatedOpen   int
+	Pass              bool
+	Blocks            []string
+	GrossRisk         float64
+	ByAsset           map[string]float64
+	ByRegion          map[string]float64
+	ByGroup           map[string]float64
+	ByMarket          map[string]float64
+	OpenPositions     int
+	CorrelatedOpen    int
+	RemainingAggregate float64
+	RemainingRegion    map[string]float64
+	RemainingAsset     map[string]float64
+	Unit               string
 }
 
 type Manager struct {
@@ -56,15 +72,15 @@ func New() *Manager { return &Manager{Caps: ConservativeCaps()} }
 
 func GroupOf(canonical string) string {
 	switch strings.ToUpper(canonical) {
-	case "US100", "US500", "US30":
+	case "US100", "US500", "US30", "AAPL", "MSFT", "NVDA", "META", "AMZN":
 		return GroupUSEquity
 	case "GOLD", "SILVER":
 		return GroupPrecious
-	case "OIL", "CRUDE", "CRUDE_OIL":
+	case "OIL", "OIL_CRUDE", "CRUDE", "CRUDE_OIL":
 		return GroupEnergy
-	case "EUROPE", "UK", "GERMANY":
+	case "DE40", "UK100", "EUROPE", "UK", "GERMANY":
 		return GroupEurope
-	case "JAPAN", "HK", "CHINA":
+	case "J225", "CN50", "JAPAN", "HK", "CHINA", "CHINA_HK":
 		return GroupAsia
 	case "BTC", "ETH", "BITCOIN":
 		return GroupCrypto
@@ -73,13 +89,34 @@ func GroupOf(canonical string) string {
 	}
 }
 
+func UniqueSorted(xs []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, x := range xs {
+		x = strings.TrimSpace(x)
+		if x == "" || seen[x] {
+			continue
+		}
+		seen[x] = true
+		out = append(out, x)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (m *Manager) Evaluate(open []Position, candidate Position) Result {
-	r := Result{Pass: true, ByAsset: map[string]float64{}, ByRegion: map[string]float64{}, ByGroup: map[string]float64{}}
+	r := Result{
+		Pass: true, Unit: m.Caps.Unit,
+		ByAsset: map[string]float64{}, ByRegion: map[string]float64{},
+		ByGroup: map[string]float64{}, ByMarket: map[string]float64{},
+		RemainingRegion: map[string]float64{}, RemainingAsset: map[string]float64{},
+	}
+	unknown := false
 	add := func(p Position) {
 		r.OpenPositions++
+		r.ByMarket[p.Canonical] += p.RiskMoney
 		if !p.RiskKnown {
-			r.Pass = false
-			r.Blocks = append(r.Blocks, "unknown monetary risk blocks new order")
+			unknown = true
 			return
 		}
 		r.GrossRisk += p.RiskMoney
@@ -89,6 +126,10 @@ func (m *Manager) Evaluate(open []Position, candidate Position) Result {
 	}
 	for _, p := range open {
 		add(p)
+	}
+	if unknown {
+		r.Pass = false
+		r.Blocks = append(r.Blocks, "unknown monetary risk blocks new order")
 	}
 	if candidate.Canonical != "" {
 		if !candidate.RiskKnown {
@@ -125,6 +166,14 @@ func (m *Manager) Evaluate(open []Position, candidate Position) Result {
 				r.Blocks = append(r.Blocks, "max total open positions")
 			}
 		}
+	}
+	r.Blocks = UniqueSorted(r.Blocks)
+	r.RemainingAggregate = m.Caps.MaxAggregateRisk - r.GrossRisk
+	for k, v := range r.ByRegion {
+		r.RemainingRegion[k] = m.Caps.MaxRiskPerRegion - v
+	}
+	for k, v := range r.ByAsset {
+		r.RemainingAsset[k] = m.Caps.MaxRiskPerAssetClass - v
 	}
 	return r
 }

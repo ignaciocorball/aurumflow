@@ -46,6 +46,12 @@ func TestScoreExplainableAndNoFabrication(t *testing.T) {
 	if rs[0].Coverage <= 0 || rs[0].Coverage > 100 {
 		t.Fatal(rs[0].Coverage)
 	}
+	if rs[0].EvidenceConfidence != rs[0].Coverage/100 {
+		t.Fatal(rs[0].EvidenceConfidence)
+	}
+	if rs[0].Coverage < 50 && rs[0].EvidenceConfidence > 0.5 {
+		t.Fatal("coverage must not present as high confidence")
+	}
 }
 
 func TestMissingNotZeroAndCoverageSeparate(t *testing.T) {

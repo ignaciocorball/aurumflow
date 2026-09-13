@@ -22,6 +22,7 @@
   "p7_freeze": "READY_SHADOW",
   "p7_1_freeze": "READY",
   "p8_freeze": "READY_SHADOW",
+  "p8_1_freeze": "READY_SHADOW",
   "multi_market_demo_execution": "OFF",
   "capital_demo_execution_plane": "VERIFIED_WORKING",
   "p0_snapshot": {
@@ -423,7 +424,8 @@
     {"phase": "P6", "name": "Human Decision Console", "status": "READY_P6_1_OBSERVATORY"},
     {"phase": "P7", "name": "Global Capital Surface", "status": "READY_SHADOW"},
     {"phase": "P7.1", "name": "Official Live World Mesh", "status": "READY"},
-    {"phase": "P8", "name": "Multi-Market Shadow Orchestrator", "status": "READY_SHADOW"}
+    {"phase": "P8", "name": "Multi-Market Shadow Orchestrator", "status": "READY_SHADOW"},
+    {"phase": "P8.1", "name": "Live Cross-Asset Surface", "status": "READY_SHADOW"}
   ],
   "documents": [
     "docs/audit/00_EXECUTIVE_SUMMARY.md",
@@ -498,6 +500,11 @@
     "docs/audit/69_P8_DECISION_ORCHESTRATOR.md",
     "docs/audit/70_P8_MULTI_MARKET_SHADOW.md",
     "docs/audit/71_P7_1_P8_FREEZE_REPORT.md",
+    "docs/audit/72_P8_1_WORLD_HASH.md",
+    "docs/audit/73_P8_1_ELIGIBILITY_AND_RISK.md",
+    "docs/audit/74_P8_1_LEGACY_MULTI_INSTRUMENT.md",
+    "docs/audit/75_P8_1_LIVE_SURFACE.md",
+    "docs/audit/76_P8_1_FREEZE_REPORT.md",
     "docs/audit/P1_LOCAL_CORPUS_MANIFEST.md",
     "docs/audit/MANIFEST.json"
   ]

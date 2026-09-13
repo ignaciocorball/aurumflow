@@ -6,14 +6,22 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"aurumflow/internal/eligibility"
 	"aurumflow/internal/globalsources"
 	"aurumflow/internal/logger"
+	"aurumflow/internal/microcap"
 	"aurumflow/internal/opportunity"
 	"aurumflow/internal/ops"
 	"aurumflow/internal/orchestrator"
 	"aurumflow/internal/scanner"
 	"aurumflow/internal/worldstate"
+)
+
+var (
+	slowMu   sync.Mutex
+	slowHold worldstate.WorldState
 )
 
 func runWorldSnapshot(fixture bool) {
@@ -162,22 +170,29 @@ func publishWorld(srv *ops.Server, fixture bool) {
 			in, _ = worldstate.LoadOfficialInput(ctx, now)
 		}
 	}
-	in.BTCMicro = true
+	st := srv.Get()
+	in.Micro = microcap.BTCFromRuntime(true, st.L2QuotesOK || st.BookSynced, st.LastPressure != 0 || st.L2QuotesOK, st.LastV1Class != "", st.Absorption != 0 || strings.Contains(strings.ToUpper(st.LastV1Class), "ABSORB"), healthFromStatus(st))
+	in.BTCMicro = in.Micro.Healthy()
 	ws := worldstate.At(now, in)
+	elig := eligibility.New()
+	ws = elig.ApplyToWorld(ws)
 	ranks := opportunity.Rank(ws)
 	orch := orchestrator.New()
-	elig := eligibility.New()
 	for i, r := range ranks {
-		p := orch.Propose(ws, r, "", "")
-		st := r.State
-		st.Attention = r.Score
-		st.Coverage = r.Coverage
-		st.Proposal = p.Decision
-		st.EligReason = string(p.Eligibility)
-		ranks[i].State = st
-		elig.Set(eligibility.Entry{Canonical: r.Market, Status: p.Eligibility, Reason: strings.Join(p.Blocking, ";")})
+		e := elig.Get(r.Market)
+		p := orch.ProposeFull(ws, r, "", "", e.Status, nil)
+		stt := r.State
+		stt.Attention = r.Score
+		stt.Coverage = r.Coverage
+		stt.Proposal = p.Decision
+		stt.Eligibility = e.Status
+		stt.EligReason = e.Reason
+		ranks[i].State = stt
 	}
 	ws = scanner.AttachOpportunity(ws, ranks)
+	slowMu.Lock()
+	slowHold = ws
+	slowMu.Unlock()
 	reg := globalsources.NewRegistry()
 	truth := "UNKNOWN"
 	if !fixture && ws.Valid == "CURRENT_WORLD_STATE_VALID" {
@@ -214,6 +229,8 @@ func refreshWorld(srv *ops.Server, fixture bool) {
 		liveTick := time.NewTicker(6 * time.Hour)
 		defer cacheTick.Stop()
 		defer liveTick.Stop()
+		liveFrame := time.NewTicker(5 * time.Second)
+		defer liveFrame.Stop()
 		for {
 			select {
 			case <-cacheTick.C:
@@ -223,7 +240,49 @@ func refreshWorld(srv *ops.Server, fixture bool) {
 					_, _ = worldstate.LoadOfficialInput(context.Background(), time.Now().UTC())
 				}
 				publishWorld(srv, fixture)
+			case <-liveFrame.C:
+				materializeLive(srv)
 			}
 		}
 	}()
+}
+
+func healthFromStatus(st ops.Status) string {
+	if st.L2QuotesOK && st.BookSynced {
+		return "HEALTHY"
+	}
+	if st.L2QuotesOK {
+		return "OK"
+	}
+	return "UNKNOWN"
+}
+
+func materializeLive(srv *ops.Server) {
+	slowMu.Lock()
+	ws := slowHold
+	slowMu.Unlock()
+	if ws.AsOf.IsZero() {
+		return
+	}
+	st := srv.Get()
+	ws.Markets = cloneMarkets(ws.Markets)
+	if btc, ok := ws.Markets["BTC"]; ok {
+		cap := microcap.BTCFromRuntime(true, st.L2QuotesOK || st.BookSynced, st.LastPressure != 0 || st.L2QuotesOK, st.LastV1Class != "", st.Absorption != 0, healthFromStatus(st))
+		btc.MicroAvailable = cap.Healthy()
+		ws.Markets["BTC"] = btc
+	}
+	ws = worldstate.Finalize(ws)
+	elig := eligibility.New()
+	ranks := opportunity.Rank(ws)
+	ws = scanner.AttachOpportunity(ws, ranks)
+	_ = elig
+	srv.SetWorld(ws)
+}
+
+func cloneMarkets(in map[string]worldstate.MarketState) map[string]worldstate.MarketState {
+	out := make(map[string]worldstate.MarketState, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }

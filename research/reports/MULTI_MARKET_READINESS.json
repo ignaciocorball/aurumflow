@@ -1,0 +1,132 @@
+[
+  {
+    "Market": "GOLD",
+    "Data": 12,
+    "Strategy": 70,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 40,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "SILVER",
+    "Data": 12,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 34,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "OIL_CRUDE",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "US100",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "US500",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "US30",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "DE40",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "UK100",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "J225",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  },
+  {
+    "Market": "CN50",
+    "Data": 0,
+    "Strategy": 35,
+    "Monetary": 55,
+    "Execution": 45,
+    "Risk": 40,
+    "Operations": 20,
+    "Total": 32,
+    "Notes": [
+      "broker status not TRADEABLE"
+    ]
+  }
+]

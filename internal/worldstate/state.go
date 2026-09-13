@@ -6,6 +6,8 @@ import (
 	"aurumflow/internal/cftc"
 	"aurumflow/internal/crossasset"
 	"aurumflow/internal/globalsources"
+	"aurumflow/internal/livesurface"
+	"aurumflow/internal/microcap"
 	"aurumflow/internal/sessions"
 	"aurumflow/internal/worlddomain"
 	"aurumflow/internal/xasset"
@@ -20,6 +22,8 @@ type Input struct {
 	BTCMicro     bool
 	GoldQuotes   bool
 	Production   bool
+	Micro        microcap.Capability
+	Live         livesurface.Frame
 }
 
 type GlobalLiquidityState struct {
@@ -86,10 +90,18 @@ type MarketState struct {
 	Setup              worlddomain.SetupState
 	Attention          float64
 	Coverage           float64
+	Tier               string
 	Proposal           string
 	EligReason         string
 	Evidence           []string
 	Risks              []string
+	Resolved           bool
+	MarketStatus       string
+	SessionLocal       string
+	QuoteAgeSec        float64
+	SourceBadge        string
+	LegacyCompat       string
+	Bid, Ask, Mid      float64
 }
 
 type WorldState struct {
@@ -109,6 +121,9 @@ type WorldState struct {
 	Valid        string
 	RejectedFix  int
 	Origins      []string
+	Used         []UsedObs
+	Hash         string
+	Live         livesurface.Frame
 }
 
 func At(t time.Time, in Input) WorldState {
@@ -130,7 +145,12 @@ func At(t time.Time, in Input) WorldState {
 	ws.Risk = risk(obs, t, agree, ws.Liquidity.Class)
 	ws.Regions = regions(obs, t, in.COT, xs)
 	ws.AssetClasses = assets(obs, t, in.COT, xs, ws.Risk)
-	ws.Markets = markets(obs, t, in.COT, xs, in.BTCMicro, in.GoldQuotes, ws)
+	btcMicro := in.BTCMicro || in.Micro.Healthy()
+	ws.Markets = markets(obs, t, in.COT, xs, btcMicro, in.GoldQuotes, in.Micro, ws)
+	ws.Used = CollectUsed(obs, t)
+	if len(in.Live.Features) > 0 || len(in.Live.Quotes) > 0 {
+		ws = ApplyLiveFrame(ws, in.Live)
+	}
 	for _, e := range ws.Liquidity.Evidence {
 		ws.Provenance = append(ws.Provenance, e)
 	}
@@ -153,7 +173,7 @@ func At(t time.Time, in Input) WorldState {
 	} else {
 		ws.Valid = "FIXTURE_OR_TEST"
 	}
-	return ws
+	return Finalize(ws)
 }
 
 func filterProduction(obs []worlddomain.ContextObservation, t time.Time, production bool) ([]worlddomain.ContextObservation, int) {
@@ -453,20 +473,23 @@ func assets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, x
 	return out
 }
 
-func markets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, xs []crossasset.Snapshot, btcMicro, goldQuotes bool, ws WorldState) map[string]MarketState {
+func markets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, xs []crossasset.Snapshot, btcMicro, goldQuotes bool, micro microcap.Capability, ws WorldState) map[string]MarketState {
 	ids := []struct {
 		id   string
 		reg  worlddomain.Region
 		ac   worlddomain.AssetClass
 		elig worlddomain.ExecEligibility
 	}{
-		{"GOLD", worlddomain.RegionGlobal, worlddomain.AssetPrecious, worlddomain.EligNotCalibrated},
+		{"GOLD", worlddomain.RegionGlobal, worlddomain.AssetPrecious, worlddomain.EligAnalysis},
 		{"SILVER", worlddomain.RegionGlobal, worlddomain.AssetPrecious, worlddomain.EligAnalysis},
-		{"OIL", worlddomain.RegionGlobal, worlddomain.AssetEnergy, worlddomain.EligAnalysis},
+		{"OIL_CRUDE", worlddomain.RegionGlobal, worlddomain.AssetEnergy, worlddomain.EligAnalysis},
 		{"US100", worlddomain.RegionUS, worlddomain.AssetEquities, worlddomain.EligAnalysis},
 		{"US500", worlddomain.RegionUS, worlddomain.AssetEquities, worlddomain.EligAnalysis},
-		{"EUROPE", worlddomain.RegionEurope, worlddomain.AssetEquities, worlddomain.EligAnalysis},
-		{"JAPAN", worlddomain.RegionJapan, worlddomain.AssetEquities, worlddomain.EligAnalysis},
+		{"US30", worlddomain.RegionUS, worlddomain.AssetEquities, worlddomain.EligAnalysis},
+		{"DE40", worlddomain.RegionEurope, worlddomain.AssetEquities, worlddomain.EligAnalysis},
+		{"UK100", worlddomain.RegionEurope, worlddomain.AssetEquities, worlddomain.EligAnalysis},
+		{"J225", worlddomain.RegionJapan, worlddomain.AssetEquities, worlddomain.EligAnalysis},
+		{"CN50", worlddomain.RegionChinaHK, worlddomain.AssetEquities, worlddomain.EligAnalysis},
 		{"CHINA_HK", worlddomain.RegionChinaHK, worlddomain.AssetEquities, worlddomain.EligAnalysis},
 		{"BTC", worlddomain.RegionGlobal, worlddomain.AssetCrypto, worlddomain.EligAnalysis},
 	}
@@ -476,7 +499,7 @@ func markets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, 
 		xmap[x.Symbol] = x
 	}
 	for _, m := range ids {
-		st := MarketState{Market: m.id, Region: m.reg, AssetClass: m.ac, Eligibility: m.elig, Setup: worlddomain.SetupNone, DataQuality: worlddomain.HealthUnknown, PriceTrend: "UNKNOWN", RelativeStrength: "UNKNOWN", Volatility: "UNKNOWN", CapitalFlowContext: "UNKNOWN", Positioning: "UNKNOWN", MacroAlignment: "UNKNOWN", CrossAsset: "UNKNOWN"}
+		st := MarketState{Market: m.id, Region: m.reg, AssetClass: m.ac, Eligibility: m.elig, Setup: worlddomain.SetupNone, DataQuality: worlddomain.HealthUnknown, PriceTrend: "UNKNOWN", RelativeStrength: "UNKNOWN", Volatility: "UNKNOWN", CapitalFlowContext: "UNKNOWN", Positioning: "UNKNOWN", MacroAlignment: "UNKNOWN", CrossAsset: "UNKNOWN", Resolved: true, SourceBadge: "UNKNOWN", LegacyCompat: legacyCompat(m.id)}
 		if x, ok := xmap[m.id]; ok && x.Present {
 			st.PriceTrend = trendWord(x.Return)
 			st.RelativeStrength = trendWord(x.RelStrengthVsUS500)
@@ -506,14 +529,17 @@ func markets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, 
 			} else if _, ok := val(obs, "CFTC", "SILVER_MM_NET", t); ok {
 				st.Positioning = "CFTC silver observed"
 			}
-		case "OIL":
+		case "OIL_CRUDE", "OIL":
 			st.MacroAlignment, _ = globalsources.OilPhysicalState(obs, t)
+			if st.MacroAlignment == "" {
+				st.MacroAlignment = "UNKNOWN"
+			}
 			if c := cftc.ContextFor(cot, "CRUDE_OIL", t); c.Present {
 				st.Positioning = "CFTC crude observed"
 			} else if _, ok := val(obs, "CFTC", "CRUDE_OIL_MM_NET", t); ok {
 				st.Positioning = "CFTC crude observed"
 			}
-		case "US100", "US500":
+		case "US100", "US500", "US30":
 			if o, ok := val(obs, "ICI", "DOMESTIC_EQUITY", t); ok {
 				st.CapitalFlowContext = flowWord(o.Value)
 			}
@@ -524,14 +550,22 @@ func markets(obs []worlddomain.ContextObservation, t time.Time, cot []cftc.Row, 
 			} else if _, ok := val(obs, "CFTC", "ES_MM_NET", t); ok && m.id == "US500" {
 				st.Positioning = "CFTC ES observed"
 			}
-		case "JAPAN":
+		case "J225", "JAPAN":
 			if o, ok := val(obs, "JPX", "FOREIGN", t); ok {
 				st.CapitalFlowContext = flowWord(o.Value)
 			}
-		case "CHINA_HK":
+		case "DE40", "UK100", "EUROPE":
+			st.MacroAlignment = string(ws.Rates.Direction)
+			if st.MacroAlignment == "" {
+				st.MacroAlignment = "UNKNOWN"
+			}
+		case "CHINA_HK", "CN50":
 			st.CapitalFlowContext = globalsources.HKEXStatus()
 		case "BTC":
-			st.MicroAvailable = btcMicro
+			st.MicroAvailable = btcMicro || (micro.Market == "BTC" && micro.Available())
+			if st.MicroAvailable {
+				st.Evidence = append(st.Evidence, "BTC microstructure capability: sensing only, not a trade signal")
+			}
 			st.Evidence = append(st.Evidence, "BTC is MICROSTRUCTURE_LAB + 24/7 SENSOR")
 		}
 		out[m.id] = st
@@ -598,4 +632,15 @@ func abs(v float64) float64 {
 		return -v
 	}
 	return v
+}
+
+func legacyCompat(id string) string {
+	switch id {
+	case "GOLD":
+		return "LEGACY_COMPATIBLE"
+	case "SILVER", "OIL_CRUDE", "US100", "US500", "US30", "DE40", "UK100", "J225", "CN50":
+		return "LEGACY_NEEDS_CONFIG"
+	default:
+		return "LEGACY_NOT_VALIDATED"
+	}
 }
