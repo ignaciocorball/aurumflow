@@ -20,4 +20,19 @@ func TestDefaultRegistry_NoIdenticalCFDFutures(t *testing.T) {
 	if btcSens.Relation == RelIdentical {
 		t.Fatal("proxy must not be IDENTICAL")
 	}
+	var okx, binance VenueInstrument
+	for _, s := range r.SensorsFor("BITCOIN") {
+		switch s.Symbol {
+		case "BTCUSDT":
+			binance = s
+		case "BTC-USDT-SWAP":
+			okx = s
+		}
+	}
+	if SameInstrument(binance, okx) || SameInstrument(btcExec, okx) {
+		t.Fatal("Binance BTCUSDT != OKX BTC-USDT-SWAP != Capital BTCUSD")
+	}
+	if okx.Relation != RelCorrelatedProxy {
+		t.Fatalf("okx relation %s", okx.Relation)
+	}
 }

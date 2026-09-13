@@ -53,6 +53,8 @@ type Loop struct {
 	UnknownPositions    int
 	Decision            *strategy.DecisionContext
 	LastSignalText      string
+	// OnLegacySignal is SHADOW observation only. It must not open, close, filter, or veto.
+	OnLegacySignal      func(sig *models.TradeSignal, now time.Time)
 	AccountID           string
 	tickCount           int
 	lastStatusLog       time.Time
@@ -770,6 +772,9 @@ func (l *Loop) tick(ctx context.Context) {
 			SweepStrength:    sweepStrength,
 			LiquidityEvent:   liquidityEvent,
 		})
+	}
+	if l.OnLegacySignal != nil && signal != nil {
+		l.OnLegacySignal(signal, now)
 	}
 	if l.NotifEmitter != nil {
 		l.NotifEmitter.Emit(notifications.NotifEvent{

@@ -3,6 +3,7 @@ package book
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -11,10 +12,12 @@ type Level struct {
 }
 
 type Book struct {
+	mu         sync.RWMutex
 	Bids, Asks map[float64]float64
 	LastID     int64
 	Synced     bool
 	Resyncs    int
+	Gaps       int
 	Updated    time.Time
 }
 
@@ -22,7 +25,22 @@ func New() *Book {
 	return &Book{Bids: map[float64]float64{}, Asks: map[float64]float64{}}
 }
 
+func (b *Book) Discard() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.Bids = map[float64]float64{}
+	b.Asks = map[float64]float64{}
+	b.LastID = 0
+	b.Synced = false
+	b.Updated = time.Time{}
+}
+
 func (b *Book) ApplySnapshot(lastID int64, bids, asks []Level) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.Bids = map[float64]float64{}
 	b.Asks = map[float64]float64{}
 	for _, l := range bids {
@@ -40,9 +58,9 @@ func (b *Book) ApplySnapshot(lastID int64, bids, asks []Level) {
 	b.Updated = time.Now().UTC()
 }
 
-// ApplyFuturesDelta applies a Binance USD-M depth diff.
-// First applicable event: U <= lastID+1 <= u. Subsequent: pu == lastID.
 func (b *Book) ApplyFuturesDelta(firstID, finalID, prevFinal int64, bids, asks []Level) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if !b.Synced {
 		return fmt.Errorf("book not synced")
 	}
@@ -53,34 +71,43 @@ func (b *Book) ApplyFuturesDelta(firstID, finalID, prevFinal int64, bids, asks [
 		// first after snapshot
 	} else if prevFinal != 0 && prevFinal != b.LastID {
 		b.Synced = false
+		b.Gaps++
 		b.Resyncs++
 		return fmt.Errorf("gap: pu=%d last=%d", prevFinal, b.LastID)
 	} else if prevFinal == 0 && firstID != b.LastID+1 {
 		b.Synced = false
+		b.Gaps++
 		b.Resyncs++
 		return fmt.Errorf("gap: U=%d last=%d", firstID, b.LastID)
 	}
-	for _, l := range bids {
-		if l.Qty == 0 {
-			delete(b.Bids, l.Price)
-		} else {
-			b.Bids[l.Price] = l.Qty
-		}
-	}
-	for _, l := range asks {
-		if l.Qty == 0 {
-			delete(b.Asks, l.Price)
-		} else {
-			b.Asks[l.Price] = l.Qty
-		}
-	}
+	applyLevels(b.Bids, bids)
+	applyLevels(b.Asks, asks)
 	b.LastID = finalID
 	b.Updated = time.Now().UTC()
 	return nil
 }
 
+func applyLevels(side map[float64]float64, levels []Level) {
+	for _, l := range levels {
+		if l.Qty == 0 {
+			delete(side, l.Price)
+		} else {
+			side[l.Price] = l.Qty
+		}
+	}
+}
+
 func (b *Book) BestBidAsk() (bid, ask float64, ok bool) {
-	if b == nil || !b.Synced || len(b.Bids) == 0 || len(b.Asks) == 0 {
+	if b == nil {
+		return 0, 0, false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.bestBidAskLocked()
+}
+
+func (b *Book) bestBidAskLocked() (bid, ask float64, ok bool) {
+	if !b.Synced || len(b.Bids) == 0 || len(b.Asks) == 0 {
 		return 0, 0, false
 	}
 	for p := range b.Bids {
@@ -88,7 +115,6 @@ func (b *Book) BestBidAsk() (bid, ask float64, ok bool) {
 			bid = p
 		}
 	}
-	ask = 0
 	for p := range b.Asks {
 		if ask == 0 || p < ask {
 			ask = p
@@ -106,7 +132,12 @@ func (b *Book) SpreadMid() (spread, mid float64, ok bool) {
 }
 
 func (b *Book) Microprice() (float64, bool) {
-	bid, ask, ok := b.BestBidAsk()
+	if b == nil {
+		return 0, false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	bid, ask, ok := b.bestBidAskLocked()
 	if !ok {
 		return 0, false
 	}
@@ -119,6 +150,11 @@ func (b *Book) Microprice() (float64, bool) {
 }
 
 func (b *Book) Imbalance(n int) float64 {
+	if b == nil {
+		return 0
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	bids := topN(b.Bids, n, true)
 	asks := topN(b.Asks, n, false)
 	var bv, av float64
@@ -152,8 +188,125 @@ func topN(m map[float64]float64, n int, highFirst bool) []Level {
 }
 
 func (b *Book) Age() time.Duration {
+	if b == nil {
+		return 0
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	if b.Updated.IsZero() {
 		return 0
 	}
 	return time.Since(b.Updated)
+}
+
+func (b *Book) AgeAt(now time.Time) time.Duration {
+	if b == nil {
+		return 0
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.Updated.IsZero() {
+		return 0
+	}
+	return now.Sub(b.Updated)
+}
+
+func (b *Book) FeaturesAccepted() bool {
+	if b == nil {
+		return false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.Synced
+}
+
+func (b *Book) DepthQty(n int) (bidQty, askQty float64) {
+	if b == nil {
+		return 0, 0
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if !b.Synced {
+		return 0, 0
+	}
+	for _, l := range topN(b.Bids, n, true) {
+		bidQty += l.Qty
+	}
+	for _, l := range topN(b.Asks, n, false) {
+		askQty += l.Qty
+	}
+	return bidQty, askQty
+}
+
+func (b *Book) ApplySeqDelta(seq, prev int64, bids, asks []Level) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.Synced {
+		return fmt.Errorf("book not synced")
+	}
+	if prev != 0 && prev != b.LastID {
+		b.Synced = false
+		b.Gaps++
+		b.Resyncs++
+		return fmt.Errorf("gap: prev=%d last=%d", prev, b.LastID)
+	}
+	if prev == 0 && seq != b.LastID+1 && b.LastID != 0 {
+		b.Synced = false
+		b.Gaps++
+		b.Resyncs++
+		return fmt.Errorf("gap: seq=%d last=%d", seq, b.LastID)
+	}
+	applyLevels(b.Bids, bids)
+	applyLevels(b.Asks, asks)
+	b.LastID = seq
+	b.Updated = time.Now().UTC()
+	return nil
+}
+
+// CopyTop returns copies of the top n bid/ask levels for feature engines.
+func (b *Book) CopyTop(n int) (bids, asks map[float64]float64) {
+	if b == nil {
+		return map[float64]float64{}, map[float64]float64{}
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if n <= 0 {
+		return copyTopMap(b.Bids, len(b.Bids), true), copyTopMap(b.Asks, len(b.Asks), false)
+	}
+	return copyTopMap(b.Bids, n, true), copyTopMap(b.Asks, n, false)
+}
+
+func (b *Book) MarkUnsynced() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.Synced = false
+	b.mu.Unlock()
+}
+
+func (b *Book) IncResyncs() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.Resyncs++
+	b.mu.Unlock()
+}
+
+func (b *Book) Meta() (synced bool, lastID int64, gaps, resyncs int) {
+	if b == nil {
+		return false, 0, 0, 0
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.Synced, b.LastID, b.Gaps, b.Resyncs
+}
+
+func copyTopMap(m map[float64]float64, n int, highFirst bool) map[float64]float64 {
+	out := map[float64]float64{}
+	for _, l := range topN(m, n, highFirst) {
+		out[l.Price] = l.Qty
+	}
+	return out
 }

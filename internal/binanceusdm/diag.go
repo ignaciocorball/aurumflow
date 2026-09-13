@@ -37,23 +37,40 @@ func DiagnoseWSS(ctx context.Context) WSSDiag {
 	}
 	_ = conn.Close()
 	d.TLS = "ok"
+	// Official 2026 split: /market for aggTrade, /public for depth. Legacy /ws retired 2026-04-23.
+	urls := []string{
+		"wss://fstream.binance.com/market/ws/btcusdt@aggTrade",
+		"wss://fstream.binance.com/market/stream?streams=btcusdt@aggTrade",
+		"wss://fstream.binance.com/public/ws/btcusdt@depth@100ms",
+		"wss://fstream.binance.com/public/stream?streams=btcusdt@depth@100ms",
+		"wss://fstream.binance.com/ws/btcusdt@aggTrade",
+	}
 	ws := websocket.Dialer{HandshakeTimeout: 8 * time.Second}
-	wctx, cancel2 := context.WithTimeout(ctx, 10*time.Second)
-	wc, _, err := ws.DialContext(wctx, "wss://fstream.binance.com/ws/btcusdt@aggTrade", nil)
-	cancel2()
-	if err != nil {
-		d.Connect = err.Error()
+	for _, u := range urls {
+		wctx, cancel2 := context.WithTimeout(ctx, 8*time.Second)
+		wc, _, err := ws.DialContext(wctx, u, nil)
+		cancel2()
+		if err != nil {
+			d.Connect = err.Error()
+			continue
+		}
+		d.Connect = "ok " + u
+		_ = wc.SetReadDeadline(time.Now().Add(6 * time.Second))
+		_, _, err = wc.ReadMessage()
+		_ = wc.Close()
+		if err != nil {
+			d.Read = err.Error()
+			continue
+		}
+		d.Read = "ok " + u
+		d.Status = "OPERATIONAL"
 		return d
 	}
-	d.Connect = "ok"
-	_ = wc.SetReadDeadline(time.Now().Add(8 * time.Second))
-	_, _, err = wc.ReadMessage()
-	_ = wc.Close()
-	if err != nil {
-		d.Read = err.Error()
-		return d
+	if d.Connect == "" {
+		d.Connect = "all endpoints failed"
 	}
-	d.Read = "ok"
-	d.Status = "OPERATIONAL"
+	if d.Read == "" {
+		d.Read = "FIRST_FRAME_TIMEOUT_OR_ERROR"
+	}
 	return d
 }

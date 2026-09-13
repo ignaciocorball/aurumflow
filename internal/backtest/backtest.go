@@ -76,6 +76,9 @@ type Result struct {
 	BarsSkippedLondonNY int // bars skipped by block_london_ny_overlap
 }
 
+// maxProfitFactor caps PF when losers=0 to avoid overflow in reports/ranking.
+const maxProfitFactor = 99.0
+
 // ClosedTrade holds one resolved trade for CSV/metrics (segmentación).
 type ClosedTrade struct {
 	EntryTS    time.Time
@@ -642,8 +645,11 @@ func Run(candlesM15 []models.Candle, candlesH1 []models.Candle, candlesH4 []mode
 	}
 	if grossLoss > 0 {
 		res.ProfitFactor = grossProfit / grossLoss
+		if res.ProfitFactor > maxProfitFactor {
+			res.ProfitFactor = maxProfitFactor
+		}
 	} else if grossProfit > 0 {
-		res.ProfitFactor = math.MaxFloat64
+		res.ProfitFactor = maxProfitFactor
 	}
 	if res.TotalTrades > 0 {
 		res.Expectancy = (grossProfit - grossLoss) / float64(res.TotalTrades)

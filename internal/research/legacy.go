@@ -11,15 +11,23 @@ import (
 )
 
 type SignalRow struct {
-	Time       time.Time
-	Direction  int
-	Score      int
-	State      string
-	Source     string
-	Pressure   float64
-	Confidence float64
-	RadarState string
-	Class      string
+	Time              time.Time
+	Direction         int
+	Score             int
+	State             string
+	Source            string
+	Pressure          float64
+	OriginalPressure  float64
+	DirPressure       float64
+	FlowInterp        string
+	Confidence        float64
+	RadarState        string
+	Class             string
+	CVD               float64
+	AggBuy            float64
+	AggSell           float64
+	PreReturn         float64
+	TradeVel          float64
 }
 
 func CryptoResearchConfig() backtest.Config {

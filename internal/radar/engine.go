@@ -24,6 +24,9 @@ type Engine struct {
 	PrevCVD2       float64
 	cvdAtSnap      float64
 	signedWindow   []float64
+	minuteBuy      float64
+	minuteSell     float64
+	minuteN        int
 }
 
 func NewEngine(instrument string) *Engine {
@@ -52,6 +55,12 @@ func (e *Engine) OnTrade(price, qty float64, buyerMaker bool) {
 	e.PrevCVD = prev
 	e.LastPrice = price
 	e.Events++
+	if buyerMaker {
+		e.minuteSell += qty
+	} else {
+		e.minuteBuy += qty
+	}
+	e.minuteN++
 }
 
 func (e *Engine) Has(c uint32) bool { return e.Caps&c != 0 }
@@ -139,6 +148,11 @@ func (e *Engine) Snapshot(now time.Time, feedOK bool, typicalQty float64) Pressu
 	if !e.Hyst.Allow(s.State, now) {
 		s.State = e.Hyst.Last
 	}
+	s.CVD = signed
+	s.AggBuy = e.minuteBuy
+	s.AggSell = e.minuteSell
+	s.TradeVel = float64(e.minuteN)
+	e.minuteBuy, e.minuteSell, e.minuteN = 0, 0, 0
 	e.Last = s
 	return s
 }

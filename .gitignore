@@ -33,7 +33,12 @@ logs/
 /bots
 /config/config.json
 /config/bk_config.json
-/scripts
+/scripts/*
+!/scripts/sunday_preopen.ps1
+!/scripts/sunday_go.ps1
+research/prospective/**/signals.jsonl
+research/prospective/**/signal_inputs.jsonl
+research/prospective/**/signal_outcomes.jsonl
 /.cursor
 /docs/*
 !/docs/audit/

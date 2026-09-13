@@ -38,6 +38,10 @@ type PressureSnapshot struct {
 	BookSynced     bool
 	TradeFlowOnly  bool
 	Caps           uint32
+	CVD            float64
+	AggBuy         float64
+	AggSell        float64
+	TradeVel       float64
 }
 
 func Compose(in PressureSnapshot) PressureSnapshot {

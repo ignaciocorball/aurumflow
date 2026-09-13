@@ -1,0 +1,9 @@
+{
+  "cause": "binance CSV header agg_trade_id counted as invalid (underscore hid 'aggtrade' substring)",
+  "data_rows": 135907413,
+  "files": 90,
+  "fixed": true,
+  "headers": 90,
+  "invalid_rows": 0,
+  "previous_invalid_rows": 90
+}

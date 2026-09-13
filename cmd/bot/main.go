@@ -16,6 +16,7 @@ import (
 	"aurumflow/config"
 	"aurumflow/internal/backtest"
 	"aurumflow/internal/binanceusdm"
+	"aurumflow/internal/okxswap"
 	"aurumflow/internal/core"
 	"aurumflow/internal/execution"
 	"aurumflow/internal/journal"
@@ -54,13 +55,20 @@ func main() {
 	downloadResearch := flag.Bool("download-research-data", false, "download free-core historical datasets (no secrets)")
 	preset := flag.String("preset", "free-core", "download preset")
 	researchDays := flag.Int("research-days", 30, "historical days for download/research")
-	researchName := flag.String("research", "", "research experiment (btc-radar)")
+	researchName := flag.String("research", "", "research experiment (btc-radar|flow-exhaustion-v1|exhaustion-mechanism)")
 	fromDate := flag.String("from", "", "research start YYYY-MM-DD")
 	toDate := flag.String("to", "", "research end YYYY-MM-DD")
+	datasetRole := flag.String("dataset-role", "", "discovery|holdout for flow-exhaustion-v1")
 	collectMD := flag.Bool("collect-market-data", false, "persist live public microstructure chunks")
 	collectMesh := flag.Bool("collect-free-mesh", false, "continuous free data mesh collector")
 	collectMin := flag.Int("collect-minutes", 60, "collector duration minutes")
 	wssDiag := flag.Bool("wss-diag", false, "diagnose public Binance WSS connectivity")
+	labelProspective := flag.Bool("label-prospective", false, "append due FLOW_EXHAUSTION_V1 outcomes without editing inputs")
+	prospectiveStatus := flag.Bool("prospective-status", false, "print prospective FLOW_EXHAUSTION_V1 counts")
+	shadowRuntime := flag.Bool("shadow-runtime", false, "BTC intelligence SHADOW runtime (no ExecutionProvider)")
+	l2Provider := flag.String("l2-provider", "auto", "binance|okx|auto")
+	opsPreflight := flag.Bool("ops-preflight", false, "read-only Sunday/ops preflight (no broker mutation)")
+	sundayRuntime := flag.Bool("sunday-runtime", false, "supervise SHADOW intelligence + console; does not start GOLD trading")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -104,9 +112,36 @@ func main() {
 		runDemoWeek(context.Background(), *epicFlag, *statusAddr)
 		return
 	}
+	if *prospectiveStatus {
+		runProspectiveStatus()
+		return
+	}
+	if *labelProspective {
+		runLabelProspective()
+		return
+	}
+	if *opsPreflight {
+		runOpsPreflight(context.Background())
+		return
+	}
+	if *sundayRuntime {
+		runSundayRuntime(context.Background(), *soakMin, *l2Provider)
+		return
+	}
+	if *shadowRuntime {
+		prov := *l2Provider
+		addr := *statusAddr
+		if addr == "127.0.0.1:8765" {
+			addr = "127.0.0.1:8766"
+		}
+		runShadowRuntime(context.Background(), time.Duration(*soakMin)*time.Minute, addr, prov)
+		return
+	}
 	if *wssDiag {
 		d := binanceusdm.DiagnoseWSS(context.Background())
 		logger.Info("WSS diag dns=%s tls=%s connect=%s read=%s status=%s", d.DNS, d.TLS, d.Connect, d.Read, d.Status)
+		ox := okxswap.Diagnose(context.Background())
+		logger.Info("OKX diag rest=%s dns=%s tls=%s connect=%s read=%s status=%s", ox.REST, ox.DNS, ox.TLS, ox.Connect, ox.Read, ox.Status)
 		return
 	}
 	if *downloadResearch {
@@ -114,11 +149,19 @@ func main() {
 		return
 	}
 	if *researchName != "" {
-		if *researchName != "btc-radar" {
+		switch *researchName {
+		case "btc-radar":
+			runResearchBTC(context.Background(), *fromDate, *toDate, *researchDays)
+		case "flow-exhaustion-v1":
+			runFlowExhaustionV1(context.Background(), *fromDate, *toDate, *datasetRole)
+		case "exhaustion-mechanism":
+			runExhaustionMechanism(context.Background())
+		case "event-resolution":
+			runEventResolution(context.Background())
+		default:
 			logger.Error("unknown research experiment %s", *researchName)
 			os.Exit(1)
 		}
-		runResearchBTC(context.Background(), *fromDate, *toDate, *researchDays)
 		return
 	}
 	if *collectMesh {

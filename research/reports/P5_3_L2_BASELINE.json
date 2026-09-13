@@ -1,0 +1,45 @@
+{
+  "kind": "L2_BASELINE_NO_PERFORMANCE_CLAIM",
+  "primary_l2_sensor": "binance_usdm_public",
+  "instrument": "BTCUSDT",
+  "venue_relation": "CORRELATED_PROXY",
+  "authentication": false,
+  "trading_capability": false,
+  "binance_wss": {
+    "dns": "ok",
+    "tls": "ok",
+    "connect": "ok wss://fstream.binance.com/market/ws/btcusdt@aggTrade",
+    "first_frame": "ok",
+    "status": "OPERATIONAL",
+    "legacy_ws": "retired_2026-04-23"
+  },
+  "okx_wss": {
+    "rest": "http_200",
+    "status": "OPERATIONAL",
+    "used_as_primary": false
+  },
+  "book": {
+    "synced": true,
+    "gaps": 0,
+    "features": ["spread", "microprice", "imbalance_1_5_10_20", "depletion", "replenishment", "persistence"]
+  },
+  "soak": {
+    "duration_min": 60,
+    "trades": 8563,
+    "snapshots": 3598,
+    "wss_depth_deltas": 0,
+    "gaps": 0,
+    "drops": 0,
+    "p50_ms": 145.6,
+    "p95_ms": 399.7,
+    "peak_mem_mb": 12.5,
+    "panics": 0
+  },
+  "prospective": {
+    "legacy": 0,
+    "exhaustion": 0,
+    "continuation": 0,
+    "neutral": 0,
+    "note": "schema ready; sample immature"
+  }
+}

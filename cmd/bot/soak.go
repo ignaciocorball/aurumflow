@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"aurumflow/internal/binanceusdm"
+	"aurumflow/internal/exhaustion"
+	"aurumflow/internal/journal"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/md"
 	"aurumflow/internal/radar"
@@ -43,6 +45,7 @@ func runShadowSoak(ctx context.Context, dur time.Duration) {
 	eng := radar.NewEngine("BTCUSDT")
 	eng.Book = ad.Book
 	eng.Flow = ad.Flow
+	exh := exhaustion.NewEngine("BTCUSDT")
 
 	runCtx, cancel := context.WithTimeout(ctx, dur)
 	defer cancel()
@@ -109,6 +112,7 @@ func runShadowSoak(ctx context.Context, dur time.Duration) {
 				trades++
 				if tr, ok := ev.Payload.(md.Trade); ok {
 					eng.OnTrade(tr.Price, tr.Qty, tr.BuyerMaker)
+					exh.OnTrade(ev.EventTime, tr.Price, tr.Qty, tr.BuyerMaker)
 				}
 			case md.KindBookDelta, md.KindBookSnapshot:
 				deltas++
@@ -116,11 +120,14 @@ func runShadowSoak(ctx context.Context, dur time.Duration) {
 		case <-ticker.C:
 			snap := eng.Snapshot(time.Now().UTC(), ad.Book.Synced, 1)
 			features++
+			exSnap := exh.Observe(time.Now().UTC(), 0, 0, snap.PressureScore, 0)
 			if rf != nil {
 				row, _ := json.Marshal(map[string]any{
-					"event": "radar_state", "ts": time.Now().UTC().Format(time.RFC3339),
+					"event": journal.EventExhaustionSnapshot, "ts": time.Now().UTC().Format(time.RFC3339),
 					"state": snap.State, "pressure": snap.PressureScore, "confidence": snap.Confidence,
 					"book_synced": snap.BookSynced, "cvd": ad.Flow.CVD(),
+					"v1_class": exSnap.Classification, "impact_failure": exSnap.Features.ImpactFailure,
+					"flow_efficiency": exSnap.Features.FlowEffNorm, "mode": exSnap.Mode,
 				})
 				_, _ = rf.Write(append(row, '\n'))
 			}

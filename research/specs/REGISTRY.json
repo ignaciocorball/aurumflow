@@ -1,0 +1,72 @@
+{
+  "updated_at": "2026-09-13T06:55:00Z",
+  "entries": [
+    {
+      "spec": "FLOW_EXHAUSTION_V1",
+      "status": "VALIDATED_EXTERNAL_HOLDOUT",
+      "discovery_dataset": "DISCOVERY_DATASET 2026-06-15/2026-09-11",
+      "validation_dataset": "EXTERNAL_HOLDOUT_1 2026-03-17/2026-06-14",
+      "spec_hash": "f66e744ec7f8e5785bc6d43b2fc8211941ac725bd463baa33782d955f7399b5d",
+      "result": "SUPPORTED",
+      "promoted": false,
+      "assets": {
+        "BTC_FLOW_EXHAUSTION_V1": "VALIDATED_EXTERNAL_HOLDOUT",
+        "GOLD_FLOW_EXHAUSTION": "UNVALIDATED",
+        "US100_FLOW_EXHAUSTION": "UNVALIDATED"
+      },
+      "notes": "Holdout n=50 at the pre-registered floor. Discovery numbers are POST_HOC_DISCOVERY only and were not combined with holdout. Not promoted to live Radar/Fusion."
+    },
+    {
+      "spec": "P5_2_EXHAUSTION_ENGINE",
+      "status": "READY_SHADOW_RESEARCH",
+      "feature_version": "P5.2-MECH-1",
+      "v1_unchanged": true,
+      "promoted": false,
+      "mechanism_overall": "YES",
+      "assets": {
+        "BTC_FLOW_EXHAUSTION_V1": "VALIDATED_EXTERNAL_HOLDOUT",
+        "GOLD_FLOW_EXHAUSTION": "UNVALIDATED",
+        "US100_FLOW_EXHAUSTION": "UNVALIDATED"
+      },
+      "datasets": {
+        "DISCOVERY_DATASET": "EXAMINED",
+        "EXTERNAL_HOLDOUT_1": "EXAMINED_V1_CONFIRMATORY",
+        "PROSPECTIVE_STREAM": "OPEN",
+        "PRE_2026_03_17": "UNTOUCHED"
+      },
+      "notes": "Mechanism research only. No V2 spec. Prospective recorder enriched. Exhaustion remains SHADOW."
+    },
+    {
+      "spec": "P5_3_L2_ABSORPTION_BRIDGE",
+      "status": "READY_SHADOW",
+      "feature_version": "P5.3-L2-1",
+      "v1_unchanged": true,
+      "promoted": false,
+      "primary_l2_sensor": "binance_usdm_public",
+      "datasets": {
+        "DISCOVERY_DATASET": "EXAMINED",
+        "EXTERNAL_HOLDOUT_1": "EXAMINED_V1_CONFIRMATORY",
+        "PROSPECTIVE_STREAM": "OPEN",
+        "PRE_2026_03_17": "UNTOUCHED_VALIDATION_CAPITAL"
+      },
+      "notes": "Event-resolution TradeVelocity artifact fixed. Live Binance L2 OPERATIONAL on 2026 market/public split. Absorption SHADOW. No V2."
+    },
+    {
+      "spec": "P5_4_TRUE_INCREMENTAL_L2",
+      "status": "READY",
+      "feature_version": "P5.4-L2-1",
+      "v1_unchanged": true,
+      "promoted": false,
+      "primary_l2_sensor": "binance_usdm_public",
+      "depth_endpoint": "wss://fstream.binance.com/public/ws/btcusdt@depth@100ms",
+      "okx_instrument": "BTC-USDT-SWAP",
+      "datasets": {
+        "DISCOVERY_DATASET": "EXAMINED",
+        "EXTERNAL_HOLDOUT_1": "EXAMINED_V1_CONFIRMATORY",
+        "PROSPECTIVE_STREAM": "OPEN",
+        "PRE_2026_03_17": "UNTOUCHED_VALIDATION_CAPITAL"
+      },
+      "notes": "REST snapshots are resync-only. Incremental depth deltas publish. Absorption SHADOW. Console read-only on 8766. No V2."
+    }
+  ]
+}

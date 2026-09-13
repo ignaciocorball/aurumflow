@@ -9,7 +9,7 @@ import (
 
 func TestStatusEndpoints(t *testing.T) {
 	s := NewServer("127.0.0.1:0", NewStatus())
-	s.Set(Status{ExecutionMode: "DEMO", RadarMode: "SHADOW", OpenPositions: 0})
+	s.Set(Status{ExecutionMode: "DEMO", RadarMode: "SHADOW", OpenPositions: 0, LastV1Class: "FLOW_NEUTRAL", BookCapability: "BOOK_CAPABILITY_LIMITED", ImpactFailure: 0.5, FlowEfficiency: -0.2})
 	errCh := make(chan error, 1)
 	go func() { errCh <- s.ListenAndServe() }()
 	deadline := time.Now().Add(2 * time.Second)
@@ -42,5 +42,8 @@ func TestStatusEndpoints(t *testing.T) {
 	}
 	if st.ExecutionMode != "DEMO" || st.RadarMode != "SHADOW" {
 		t.Fatalf("%+v", st)
+	}
+	if st.LastV1Class != "FLOW_NEUTRAL" || st.BookCapability != "BOOK_CAPABILITY_LIMITED" {
+		t.Fatalf("status missing exhaustion fields %+v", st)
 	}
 }

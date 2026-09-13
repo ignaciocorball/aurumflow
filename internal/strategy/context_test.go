@@ -14,7 +14,7 @@ func TestComposerIgnoresRadarContext(t *testing.T) {
 		RSI:            40,
 	}
 	a, oka := SignalComposer(in, 0.5, 5, 1)
-	in.Context = &DecisionContext{RadarMode: ModeShadowLike(), Pressure: 90, Confidence: 99, RadarState: "EXPANSION"}
+	in.Context = &DecisionContext{RadarMode: ModeShadowLike(), Pressure: 90, Confidence: 99, RadarState: "EXPANSION", V1Class: "FLOW_EXHAUSTION_CONFIRM", FlowEfficiency: -3, ImpactFailure: 4, ExhaustionEvidence: 0.9}
 	b, okb := SignalComposer(in, 0.5, 5, 1)
 	if oka != okb {
 		t.Fatal("radar context must not change signal presence")

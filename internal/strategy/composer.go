@@ -32,11 +32,15 @@ type ComposerInput struct {
 
 // DecisionContext is intelligence-plane context. It must never carry broker mutation rights.
 type DecisionContext struct {
-	RadarMode  string
-	RadarState string
-	Pressure   float64
-	Confidence float64
-	BookSynced bool
+	RadarMode         string
+	RadarState        string
+	Pressure          float64
+	Confidence        float64
+	BookSynced        bool
+	V1Class           string
+	FlowEfficiency    float64
+	ImpactFailure     float64
+	ExhaustionEvidence float64
 }
 
 // HasSweep returns true when a liquidity sweep is detected: either LiquidityEvent is set (canonical)

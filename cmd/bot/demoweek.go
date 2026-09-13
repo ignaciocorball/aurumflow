@@ -12,7 +12,9 @@ import (
 	"github.com/google/uuid"
 
 	"aurumflow/config"
+	"aurumflow/internal/core"
 	"aurumflow/internal/execution"
+	"aurumflow/internal/exhaustion"
 	"aurumflow/internal/gates"
 	"aurumflow/internal/journal"
 	"aurumflow/internal/killswitch"
@@ -21,8 +23,9 @@ import (
 	"aurumflow/internal/ops"
 	"aurumflow/internal/radar"
 	"aurumflow/internal/recovery"
-	"aurumflow/internal/core"
+	"aurumflow/internal/research"
 	"aurumflow/internal/strategy"
+	"aurumflow/pkg/models"
 )
 
 func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
@@ -107,7 +110,10 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	st.ExecutionEpic = epic
 	st.MarketStatus = details.Snapshot.MarketStatus
 	st.RadarMode = radar.ModeShadow
+	st.BookCapability = "BOOK_CAPABILITY_LIMITED"
+	st.FeedFreshness = "CAPITAL_REST"
 	started := time.Now().UTC()
+	exh := exhaustion.NewEngine(epic)
 	srv := ops.NewServer(statusAddr, st)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
@@ -125,6 +131,52 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	loop.RequireRuntimeMoney = true
 	loop.Money = cached
 	loop.Decision = &strategy.DecisionContext{RadarMode: radar.ModeShadow}
+	loop.OnLegacySignal = func(sig *models.TradeSignal, now time.Time) {
+		if sig == nil || exhaustion.MayMutateBroker() || radar.MayMutateBroker(radar.ModeShadow) {
+			return
+		}
+		dir := 1
+		if sig.Direction == "SELL" {
+			dir = -1
+		}
+		p := 0.0
+		if loop.Decision != nil {
+			p = loop.Decision.Pressure
+		}
+		snap := exh.Observe(now, dir, float64(sig.Score), p, 0)
+		if loop.Decision != nil {
+			loop.Decision.V1Class = snap.Classification
+			loop.Decision.FlowEfficiency = snap.Features.FlowEffNorm
+			loop.Decision.ImpactFailure = snap.Features.ImpactFailure
+			loop.Decision.ExhaustionEvidence = snap.ExhaustionEvidence
+		}
+		if loop.Journal != nil {
+			_ = loop.Journal.WriteLifecycle(journal.Lifecycle{
+				Event: journal.EventExhaustionSnapshot, Epic: epic, Direction: sig.Direction, Score: sig.Score,
+				Reason: snap.Classification, Status: snap.Mode,
+			})
+			if snap.Classification == exhaustion.ClassExhaustion {
+				_ = loop.Journal.WriteLifecycle(journal.Lifecycle{
+					Event: journal.EventFlowExhaustionSignal, Epic: epic, Direction: sig.Direction, Score: sig.Score,
+					SignalID: now.UTC().Format(time.RFC3339Nano) + "-" + epic,
+				})
+			}
+		}
+		if !strings.Contains(strings.ToUpper(epic), "BTC") {
+			return
+		}
+		id := now.UTC().Format("20060102T150405Z") + "-" + epic + "-" + snap.Classification
+		_ = research.AppendInput(research.ProspectiveDir, research.ProspectiveInput{
+			SignalID: id, RecordedAt: time.Now().UTC(), Timestamp: now.UTC(), Instrument: "BTCUSDT",
+			LegacyDirection: dir, LegacyScore: sig.Score, PressureScore: p,
+			DirectionalPressure: snap.DirectionalPressure, V1Classification: snap.Classification,
+			Features: snap.Features, GitCommit: gitHead(), FeatureVersion: exhaustion.FeatureVersion,
+			SpecHash: exhaustion.V1SpecHash, OutcomeKnown: false,
+		})
+		if loop.Journal != nil {
+			_ = loop.Journal.WriteLifecycle(journal.Lifecycle{Event: journal.EventProspectiveInput, Epic: epic, SignalID: id})
+		}
+	}
 	if execMode == config.ExecutionDryRun {
 		loop.Provider = &execution.DryRunProvider{Inner: loop.Exec}
 	}
@@ -152,8 +204,21 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				if loop.Decision != nil {
 					cur.RadarState = loop.Decision.RadarState
 					cur.Pressure = loop.Decision.Pressure
+					cur.LastPressure = loop.Decision.Pressure
 					cur.Confidence = loop.Decision.Confidence
+					cur.LastV1Class = loop.Decision.V1Class
+					cur.FlowEfficiency = loop.Decision.FlowEfficiency
+					cur.ImpactFailure = loop.Decision.ImpactFailure
 				}
+				if loop.LastSignalText == "BUY" {
+					cur.LastLegacyDir = 1
+				} else if loop.LastSignalText == "SELL" {
+					cur.LastLegacyDir = -1
+				}
+				cur.BookCapability = "BOOK_CAPABILITY_LIMITED"
+				pst := research.ReadProspectiveStatus(research.ProspectiveDir)
+				cur.ProspectiveTotal = pst.Signals
+				cur.ProspectiveExh = pst.Exhaustion
 				if pr, err := sess.client.GetPositions(runCtx); err == nil {
 					cur.OpenPositions = len(pr.Positions)
 				}

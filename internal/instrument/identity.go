@@ -6,6 +6,7 @@ const (
 	RelIdentical = "IDENTICAL"
 	RelProxy     = "proxy"
 	RelCorrelated = "correlated_underlying_proxy"
+	RelCorrelatedProxy = "CORRELATED_PROXY"
 	RelNone      = "none"
 )
 
@@ -42,6 +43,7 @@ func DefaultRegistry() Registry {
 			{Venue: "cme", Symbol: "GC", Class: "future", Role: "sensor", AssetID: "GOLD", Relation: RelCorrelated},
 			{Venue: "capital.com", Symbol: "BTCUSD", Class: "cfd", Role: "execution", AssetID: "BITCOIN", Relation: RelProxy},
 			{Venue: "binance_usdm", Symbol: "BTCUSDT", Class: "future", Role: "sensor", AssetID: "BITCOIN", Relation: RelProxy},
+			{Venue: "okx", Symbol: "BTC-USDT-SWAP", Class: "future", Role: "sensor", AssetID: "BITCOIN", Relation: RelCorrelatedProxy},
 			{Venue: "capital.com", Symbol: "US100", Class: "cfd", Role: "execution", AssetID: "NASDAQ100", Relation: RelProxy},
 			{Venue: "cme", Symbol: "NQ", Class: "future", Role: "sensor", AssetID: "NASDAQ100", Relation: RelCorrelated},
 		},

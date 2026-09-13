@@ -29,6 +29,30 @@ func TestGapResync(t *testing.T) {
 	}
 }
 
+func TestSeqDeltaGap(t *testing.T) {
+	b := New()
+	b.ApplySnapshot(10, []Level{{1, 1}}, []Level{{2, 1}})
+	if err := b.ApplySeqDelta(20, 19, nil, nil); err == nil || b.Synced || b.Gaps < 1 {
+		t.Fatal("expected seq gap")
+	}
+}
+
+func TestCrashRestartFreshSnapshot(t *testing.T) {
+	b := New()
+	b.ApplySnapshot(10, []Level{{100, 1}}, []Level{{101, 1}})
+	b.Discard()
+	if b.Synced || b.LastID != 0 {
+		t.Fatal("discard")
+	}
+	if err := b.ApplySeqDelta(11, 10, nil, nil); err == nil {
+		t.Fatal("must refuse stale continuity")
+	}
+	b.ApplySnapshot(50, []Level{{100, 2}}, []Level{{101, 2}})
+	if !b.Synced || b.LastID != 50 {
+		t.Fatal("fresh snapshot")
+	}
+}
+
 func TestImbalanceAndMicroprice(t *testing.T) {
 	b := New()
 	b.ApplySnapshot(1, []Level{{10, 8}}, []Level{{11, 2}})

@@ -45,8 +45,17 @@ func TestIterZipCSVAndQuality(t *testing.T) {
 	_ = zw.Close()
 	_ = f.Close()
 	q, err := (&Archive{}).ScanDay(zp)
-	if err != nil || q.Rows != 3 || q.Duplicates < 1 {
-		t.Fatalf("%+v %v", q, err)
+	if err != nil || q.Rows != 3 || q.Duplicates < 1 || q.Invalid != 0 || q.Headers != 1 {
+		t.Fatalf("header must not be invalid: %+v %v", q, err)
+	}
+}
+
+func TestHeaderNotInvalid(t *testing.T) {
+	if !IsHeaderRow([]string{"agg_trade_id", "price", "quantity", "first_trade_id", "last_trade_id", "transact_time", "is_buyer_maker"}) {
+		t.Fatal("underscore header")
+	}
+	if IsHeaderRow([]string{"26129", "0.01", "1", "1", "1", "1498793709153", "true"}) {
+		t.Fatal("data row")
 	}
 	_ = context.Background()
 }

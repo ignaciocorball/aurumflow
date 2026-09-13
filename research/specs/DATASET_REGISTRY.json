@@ -1,0 +1,33 @@
+{
+  "updated_at": "2026-09-13T05:00:57Z",
+  "datasets": [
+    {
+      "id": "DISCOVERY_DATASET",
+      "from": "2026-06-15",
+      "to": "2026-09-11",
+      "status": "EXAMINED",
+      "role": "DISCOVERY_ONLY"
+    },
+    {
+      "id": "EXTERNAL_HOLDOUT_1",
+      "from": "2026-03-17",
+      "to": "2026-06-14",
+      "status": "EXAMINED_V1_CONFIRMATORY",
+      "role": "EXTERNAL_HOLDOUT"
+    },
+    {
+      "id": "PROSPECTIVE_STREAM",
+      "from": "2026-09-13",
+      "to": "",
+      "status": "OPEN",
+      "role": "PROSPECTIVE"
+    },
+    {
+      "id": "PRE_2026_03_17",
+      "from": "",
+      "to": "2026-03-16",
+      "status": "UNTOUCHED",
+      "role": "RESERVED_FUTURE_VALIDATION"
+    }
+  ]
+}

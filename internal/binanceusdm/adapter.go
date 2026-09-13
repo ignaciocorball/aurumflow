@@ -19,8 +19,13 @@ import (
 
 const (
 	RestBase = "https://fapi.binance.com"
-	WSBase   = "wss://fstream.binance.com/stream"
-	Symbol   = "BTCUSDT"
+	WSBase   = "wss://fstream.binance.com/market/stream"
+	WSMarket = "wss://fstream.binance.com/market/stream"
+	WSPublic = "wss://fstream.binance.com/public/stream"
+	// WSPublicSingle is the official 2026 USD-M public single-stream base
+	// (Diff Book Depth: /public/ws/<symbol>@depth@100ms).
+	WSPublicSingle = "wss://fstream.binance.com/public/ws"
+	Symbol         = "BTCUSDT"
 )
 
 // Adapter is a public, read-only Binance USD-M market-data provider.
@@ -71,6 +76,7 @@ type streamWrap struct {
 }
 
 type depthEvent struct {
+	Event     string     `json:"e"`
 	EventTime int64      `json:"E"`
 	FirstID   int64      `json:"U"`
 	FinalID   int64      `json:"u"`
@@ -180,15 +186,16 @@ func (a *Adapter) runREST(ctx context.Context, out *md.Bus) {
 			} else {
 				a.LastError = err.Error()
 			}
-			if snap, err := a.FetchSnapshot(ctx); err == nil {
-				if snap.LastUpdateID > a.Book.LastID || !a.Book.Synced {
-					if a.Book.Synced && snap.LastUpdateID > a.Book.LastID+1 {
-						a.Book.Resyncs++
-					}
+			// REST snapshots are resync-only. Treating 1Hz REST refresh as
+			// incremental flow desynchronizes the official depth stream.
+			if synced, _, _, _ := a.Book.Meta(); !synced {
+				if snap, err := a.FetchSnapshot(ctx); err == nil {
 					a.applySnapshot(snap)
+					a.Book.IncResyncs()
 					out.Publish(ctx, md.Event{
 						Kind: md.KindBookSnapshot, EventTime: time.Now().UTC(), ReceiveTime: time.Now().UTC(),
 						Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol, Seq: snap.LastUpdateID,
+						Payload: md.BookDelta{Bids: levelsMD(snap.Bids), Asks: levelsMD(snap.Asks), FinalID: snap.LastUpdateID},
 					})
 				}
 			}
@@ -209,6 +216,19 @@ func levels(rows [][]string) []book.Level {
 	return out
 }
 
+func levelsMD(rows [][]string) []md.Level {
+	out := make([]md.Level, 0, len(rows))
+	for _, r := range rows {
+		if len(r) < 2 {
+			continue
+		}
+		p, _ := strconv.ParseFloat(r[0], 64)
+		q, _ := strconv.ParseFloat(r[1], 64)
+		out = append(out, md.Level{Price: p, Qty: q})
+	}
+	return out
+}
+
 func (a *Adapter) applySnapshot(snap depthSnapshot) {
 	a.Book.ApplySnapshot(snap.LastUpdateID, levels(snap.Bids), levels(snap.Asks))
 }
@@ -225,14 +245,14 @@ func (a *Adapter) applyBuffered(snapID int64) {
 		}
 		if !started {
 			if !FirstApplicable(snapID, ev.FirstID, ev.FinalID) {
-				a.Book.Synced = false
-				a.Book.Resyncs++
+				a.Book.MarkUnsynced()
+				a.Book.IncResyncs()
 				return
 			}
 			started = true
 		}
 		_ = a.Book.ApplyFuturesDelta(ev.FirstID, ev.FinalID, ev.PrevFinal, levels(ev.Bids), levels(ev.Asks))
-		if !a.Book.Synced {
+		if synced, _, _, _ := a.Book.Meta(); !synced {
 			return
 		}
 	}
@@ -252,11 +272,12 @@ func (a *Adapter) Run(ctx context.Context, out *md.Bus) error {
 		}
 		a.Reconnects++
 		a.LastError = errString(err)
-		a.Book.Synced = false
+		a.Book.MarkUnsynced()
+		_, _, _, resyncs := a.Book.Meta()
 		_ = out.Publish(ctx, md.Event{
 			Kind: md.KindProviderHealth, EventTime: time.Now().UTC(), ReceiveTime: time.Now().UTC(),
 			Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol,
-			Payload: md.Health{OK: false, BookSynced: false, Reconnects: a.Reconnects, Resyncs: a.Book.Resyncs, LastError: a.LastError},
+			Payload: md.Health{OK: false, BookSynced: false, Reconnects: a.Reconnects, Resyncs: resyncs, LastError: a.LastError},
 		})
 		select {
 		case <-ctx.Done():
@@ -278,13 +299,20 @@ func errString(err error) string {
 
 func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Duration) error {
 	sym := strings.ToLower(a.Symbol)
-	wsURL := fmt.Sprintf("%s?streams=%s@depth@100ms/%s@aggTrade", strings.TrimRight(a.WSURL, "/"), sym, sym)
+	tradeURL := fmt.Sprintf("%s?streams=%s@aggTrade", WSMarket, sym)
+	// Official Diff Book Depth (100ms) on the 2026 public single-stream path.
+	depthURL := fmt.Sprintf("%s/%s@depth@100ms", WSPublicSingle, sym)
 	dialer := websocket.Dialer{HandshakeTimeout: 15 * time.Second}
-	conn, _, err := dialer.DialContext(ctx, wsURL, nil)
+	connT, _, err := dialer.DialContext(ctx, tradeURL, nil)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer connT.Close()
+	connD, _, err := dialer.DialContext(ctx, depthURL, nil)
+	if err != nil {
+		return err
+	}
+	defer connD.Close()
 
 	runCtx, cancel := context.WithTimeout(ctx, rotateEvery)
 	defer cancel()
@@ -292,7 +320,7 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 	a.mu.Lock()
 	a.buffered = nil
 	a.mu.Unlock()
-	a.Book.Synced = false
+	a.Book.MarkUnsynced()
 
 	snapCh := make(chan depthSnapshot, 1)
 	go func() {
@@ -306,10 +334,14 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 		snapCh <- snap
 	}()
 
-	_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
-	conn.SetPongHandler(func(string) error {
-		return conn.SetReadDeadline(time.Now().Add(90 * time.Second))
-	})
+	arm := func(c *websocket.Conn) {
+		_ = c.SetReadDeadline(time.Now().Add(90 * time.Second))
+		c.SetPongHandler(func(string) error {
+			return c.SetReadDeadline(time.Now().Add(90 * time.Second))
+		})
+	}
+	arm(connT)
+	arm(connD)
 
 	var snapApplied bool
 	pingTick := time.NewTicker(15 * time.Second)
@@ -320,9 +352,9 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 		err error
 	}
 	reads := make(chan incoming, 8)
-	go func() {
+	readLoop := func(c *websocket.Conn) {
 		for {
-			_, msg, err := conn.ReadMessage()
+			_, msg, err := c.ReadMessage()
 			select {
 			case reads <- incoming{msg, err}:
 			case <-runCtx.Done():
@@ -332,14 +364,17 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 				return
 			}
 		}
-	}()
+	}
+	go readLoop(connT)
+	go readLoop(connD)
 
 	for {
 		select {
 		case <-runCtx.Done():
 			return runCtx.Err()
 		case <-pingTick.C:
-			_ = conn.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second))
+			_ = connT.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second))
+			_ = connD.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second))
 		case snap, ok := <-snapCh:
 			if ok {
 				a.applySnapshot(snap)
@@ -348,6 +383,7 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 				_ = out.Publish(runCtx, md.Event{
 					Kind: md.KindBookSnapshot, EventTime: time.Now().UTC(), ReceiveTime: time.Now().UTC(),
 					Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol, Seq: snap.LastUpdateID,
+					Payload: md.BookDelta{Bids: levelsMD(snap.Bids), Asks: levelsMD(snap.Asks), FinalID: snap.LastUpdateID},
 				})
 			}
 			snapCh = nil
@@ -355,7 +391,8 @@ func (a *Adapter) runOnce(ctx context.Context, out *md.Bus, rotateEvery time.Dur
 			if in.err != nil {
 				return in.err
 			}
-			_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+			_ = connT.SetReadDeadline(time.Now().Add(90 * time.Second))
+			_ = connD.SetReadDeadline(time.Now().Add(90 * time.Second))
 			if err := a.handleMessage(runCtx, out, in.msg, snapApplied); err != nil {
 				return err
 			}
@@ -385,7 +422,11 @@ func (a *Adapter) handleMessage(ctx context.Context, out *md.Bus, raw []byte, sn
 		if err := json.Unmarshal(payload, &ev); err != nil {
 			return nil
 		}
-		if !snapApplied || !a.Book.Synced {
+		if !isDepthUpdate(wrap, ev) {
+			return nil
+		}
+		synced, _, _, _ := a.Book.Meta()
+		if !snapApplied || !synced {
 			a.mu.Lock()
 			a.buffered = append(a.buffered, ev)
 			if len(a.buffered) > 5000 {
@@ -395,15 +436,42 @@ func (a *Adapter) handleMessage(ctx context.Context, out *md.Bus, raw []byte, sn
 			return nil
 		}
 		if err := a.Book.ApplyFuturesDelta(ev.FirstID, ev.FinalID, ev.PrevFinal, levels(ev.Bids), levels(ev.Asks)); err != nil {
+			// Detectable gap: resync from REST. Do not treat the stale book as truth.
+			if snap, sErr := a.FetchSnapshot(ctx); sErr == nil {
+				a.applySnapshot(snap)
+				out.Publish(ctx, md.Event{
+					Kind: md.KindBookSnapshot, EventTime: time.Now().UTC(), ReceiveTime: recv,
+					Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol, Seq: snap.LastUpdateID,
+					Payload: md.BookDelta{Bids: levelsMD(snap.Bids), Asks: levelsMD(snap.Asks), FinalID: snap.LastUpdateID},
+				})
+				return nil
+			}
 			return err
 		}
+		et := time.UnixMilli(ev.EventTime).UTC()
+		if et.IsZero() {
+			et = recv
+		}
 		out.Publish(ctx, md.Event{
-			Kind: md.KindBookDelta, EventTime: time.UnixMilli(ev.EventTime).UTC(), ReceiveTime: recv,
+			Kind: md.KindBookDelta, EventTime: et, ReceiveTime: recv,
 			Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol, Seq: ev.FinalID,
-			Payload: md.BookDelta{FirstID: ev.FirstID, FinalID: ev.FinalID, PrevFinal: ev.PrevFinal},
+			Payload: md.BookDelta{
+				Bids: levelsMD(ev.Bids), Asks: levelsMD(ev.Asks),
+				FirstID: ev.FirstID, FinalID: ev.FinalID, PrevFinal: ev.PrevFinal,
+			},
 		})
 	}
 	return nil
+}
+
+func isDepthUpdate(wrap streamWrap, ev depthEvent) bool {
+	if ev.FinalID == 0 && ev.FirstID == 0 {
+		return false
+	}
+	if ev.Event == "depthUpdate" {
+		return true
+	}
+	return strings.Contains(wrap.Stream, "depth")
 }
 
 func bytesHas(b []byte, s string) bool {

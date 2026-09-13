@@ -154,6 +154,20 @@ func (a *Archive) get(ctx context.Context, url, dest string) error {
 }
 
 func IterZipCSV(zipPath string, fn func(row []string) error) error {
+	return iterZipCSV(zipPath, true, fn)
+}
+
+func IterTrades(zipPath string, fn func(AggTrade) error) error {
+	return IterZipCSV(zipPath, func(rec []string) error {
+		tr, err := ParseAggRow(rec)
+		if err != nil {
+			return nil
+		}
+		return fn(tr)
+	})
+}
+
+func iterZipCSV(zipPath string, skipHeader bool, fn func(row []string) error) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return err
@@ -178,7 +192,7 @@ func IterZipCSV(zipPath string, fn func(row []string) error) error {
 				_ = rc.Close()
 				return err
 			}
-			if len(rec) > 0 && strings.Contains(strings.ToLower(rec[0]), "aggtrade") {
+			if skipHeader && IsHeaderRow(rec) {
 				continue
 			}
 			if err := fn(rec); err != nil {
@@ -189,6 +203,20 @@ func IterZipCSV(zipPath string, fn func(row []string) error) error {
 		_ = rc.Close()
 	}
 	return nil
+}
+
+func IsHeaderRow(rec []string) bool {
+	if len(rec) == 0 {
+		return true
+	}
+	s := strings.ToLower(strings.TrimSpace(rec[0]))
+	if strings.Contains(s, "agg") && strings.Contains(s, "trade") {
+		return true
+	}
+	if _, err := strconv.ParseInt(s, 10, 64); err != nil {
+		return true
+	}
+	return false
 }
 
 func ParseAggRow(rec []string) (AggTrade, error) {
@@ -233,14 +261,18 @@ func (tr AggTrade) Event(symbol string) md.Event {
 func Aggressor(buyerMaker bool) string { return flow.ClassifyAggressor(buyerMaker) }
 
 type Quality struct {
-	Rows, Duplicates, OutOfOrder, Invalid, Gaps int
+	Rows, Duplicates, OutOfOrder, Invalid, Gaps, Headers int
 }
 
 func (a *Archive) ScanDay(zipPath string) (Quality, error) {
 	var q Quality
 	var lastID int64
 	var lastT time.Time
-	err := IterZipCSV(zipPath, func(rec []string) error {
+	err := iterZipCSV(zipPath, false, func(rec []string) error {
+		if IsHeaderRow(rec) {
+			q.Headers++
+			return nil
+		}
 		tr, err := ParseAggRow(rec)
 		if err != nil {
 			q.Invalid++

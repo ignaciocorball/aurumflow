@@ -162,6 +162,10 @@ const (
 	EventPositionUpdated = "position_updated"
 	EventPositionCloseRequested = "position_close_requested"
 	EventPositionCloseRejected = "position_close_rejected"
+	EventExhaustionSnapshot      = "EXHAUSTION_SNAPSHOT"
+	EventFlowExhaustionSignal    = "FLOW_EXHAUSTION_SIGNAL"
+	EventProspectiveInput        = "PROSPECTIVE_INPUT_RECORDED"
+	EventProspectiveOutcome      = "PROSPECTIVE_OUTCOME_RECORDED"
 )
 
 func ts() string {

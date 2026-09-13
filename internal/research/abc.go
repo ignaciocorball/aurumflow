@@ -14,6 +14,10 @@ type RadarPoint struct {
 	Confidence float64
 	Direction  int
 	State      string
+	CVD        float64
+	AggBuy     float64
+	AggSell    float64
+	TradeVel   float64
 }
 
 type Study struct {
@@ -28,9 +32,16 @@ func AlignFusion(legacy []SignalRow, radar []RadarPoint, alignAbs float64) []Sig
 		rp := latestRadar(radar, s.Time)
 		class := Classify(s.Direction, rp.Direction, rp.Pressure, alignAbs)
 		s.Pressure = rp.Pressure
+		s.OriginalPressure = rp.Pressure
+		s.DirPressure = DirectionalPressure(s.Direction, rp.Pressure)
+		s.FlowInterp = ClassifyFlow(s.Direction, rp.Pressure, alignAbs)
 		s.Confidence = rp.Confidence
 		s.RadarState = rp.State
 		s.Class = class
+		s.CVD = rp.CVD
+		s.AggBuy = rp.AggBuy
+		s.AggSell = rp.AggSell
+		s.TradeVel = rp.TradeVel
 		out = append(out, s)
 	}
 	return out
@@ -135,7 +146,7 @@ func formatBucket(lo, hi float64) string {
 func ToRadarPoints(snaps []radar.PressureSnapshot) []RadarPoint {
 	out := make([]RadarPoint, 0, len(snaps))
 	for _, s := range snaps {
-		out = append(out, RadarPoint{Time: s.Timestamp, Pressure: s.PressureScore, Confidence: s.Confidence, Direction: s.Direction, State: s.State})
+		out = append(out, RadarPoint{Time: s.Timestamp, Pressure: s.PressureScore, Confidence: s.Confidence, Direction: s.Direction, State: s.State, CVD: s.CVD, AggBuy: s.AggBuy, AggSell: s.AggSell, TradeVel: s.TradeVel})
 	}
 	return out
 }

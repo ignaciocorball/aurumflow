@@ -1,0 +1,9 @@
+{
+  "spec_id": "FLOW_EXHAUSTION_V1",
+  "spec_hash": "f66e744ec7f8e5785bc6d43b2fc8211941ac725bd463baa33782d955f7399b5d",
+  "started_at": "2026-09-13T04:46:00Z",
+  "immutable_inputs": true,
+  "outcome_known_at_write": false,
+  "path": "research/prospective/FLOW_EXHAUSTION_V1/signals.jsonl",
+  "note": "Append-only. No retroactive edits. Outcomes labeled later."
+}

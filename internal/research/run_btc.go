@@ -60,6 +60,9 @@ func ProcessDayZip(zipPath string, symbol string, e *radar.Engine, q *quality.Re
 	var pending []candles.Trade
 	var lastMin time.Time
 	return binancehist.IterZipCSV(zipPath, func(rec []string) error {
+		if binancehist.IsHeaderRow(rec) {
+			return nil
+		}
 		tr, err := binancehist.ParseAggRow(rec)
 		if err != nil {
 			q.InvalidPrice++
@@ -163,23 +166,49 @@ func FinalizeBTC(m1 []models.Candle, snaps []radar.PressureSnapshot, q quality.R
 	return res
 }
 
-func RunFromZips(ctx context.Context, paths []string, symbol string) (BTCResult, error) {
-	started := time.Now()
+func RunTape(ctx context.Context, paths []string, symbol string) (m1 []models.Candle, snaps []radar.PressureSnapshot, q quality.Report, events int, err error) {
 	e := radar.NewTradeFlowEngine(symbol)
-	var q quality.Report
-	var m1 []models.Candle
-	var snaps []radar.PressureSnapshot
-	events := 0
 	for _, p := range paths {
 		if ctx.Err() != nil {
 			break
 		}
 		before := q.Rows
-		if err := ProcessDayZip(p, symbol, e, &q, &m1, &snaps); err != nil {
-			return BTCResult{}, err
+		if err = ProcessDayZip(p, symbol, e, &q, &m1, &snaps); err != nil {
+			return nil, nil, q, events, err
 		}
 		events += q.Rows - before
 	}
 	q.Rows = events
+	return m1, snaps, q, events, nil
+}
+
+func BuildFused(m1 []models.Candle, snaps []radar.PressureSnapshot) ([]SignalRow, []RadarPoint, []PricePoint) {
+	m15 := Resample(m1, 15*time.Minute)
+	h1 := Resample(m1, time.Hour)
+	h4 := Resample(m1, 4*time.Hour)
+	legacy := ScanLegacy(m15, h1, h4, CryptoResearchConfig())
+	rp := ToRadarPoints(snaps)
+	fused := AlignFusion(legacy, rp, DefaultAlignAbs)
+	for i := range fused {
+		fused[i].PreReturn = preReturn(CandlePrices(m1), fused[i].Time, 5*time.Minute)
+	}
+	return fused, rp, CandlePrices(m1)
+}
+
+func preReturn(prices []PricePoint, at time.Time, lookback time.Duration) float64 {
+	now := priceAt(prices, at)
+	prev := priceAt(prices, at.Add(-lookback))
+	if prev == 0 {
+		return 0
+	}
+	return (now - prev) / prev
+}
+
+func RunFromZips(ctx context.Context, paths []string, symbol string) (BTCResult, error) {
+	started := time.Now()
+	m1, snaps, q, events, err := RunTape(ctx, paths, symbol)
+	if err != nil {
+		return BTCResult{}, err
+	}
 	return FinalizeBTC(m1, snaps, q, started, events), nil
 }
