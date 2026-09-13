@@ -59,7 +59,7 @@ while ($true) {
         if ($syn -ne $prev.synced) { Write-Log "book_synced=$syn gaps=$($st.book_gaps) drops=$($st.dropped_events)"; $prev.synced = $syn }
         $q = [string]$st.l2_proxy_quality
         if ($q -and $q -ne $prev.quality) { Write-Log "L2 quality $q"; $prev.quality = $q }
-        if (-not $st.book_synced) { Write-Log "WARN book unsynced — Absorption=UNAVAILABLE" }
+        if (-not $st.book_synced) { Write-Log "WARN book unsynced Absorption=UNAVAILABLE" }
         if ($st.dropped_events -gt 0) { Write-Log "WARN drops=$($st.dropped_events)" }
         if ($st.book_gaps -gt 5) { Write-Log "WARN gaps=$($st.book_gaps)" }
     } elseif ($h -eq "down") {
@@ -82,22 +82,23 @@ while ($true) {
     $tick++
     if ($tick % 5 -eq 1) {
         $out = & go run ./cmd/bot --ops-preflight 2>&1 | Out-String
-        if ($out -match '"name": "gold"[\s\S]*?"detail": "([^"]+)"') {
-            $gold = $Matches[1]
-            if ($gold -ne $prev.gold) {
-                Write-Log "GOLD market-status $gold"
-                $prev.gold = $gold
-            }
-            if ($gold -match "TRADEABLE" -and -not $tradeableAnnounced) {
-                $tradeableAnnounced = $true
-                Write-Host "================================="
-                Write-Host "GOLD IS TRADEABLE"
-                Write-Host "READY FOR DEMO CALIBRATION"
-                Write-Host "================================="
-                Write-Log "GOLD IS TRADEABLE — READY FOR DEMO CALIBRATION (no auto start)"
-            }
+        $gold = ""
+        if ($out -match "GOLD market_status=(\w+)") { $gold = $Matches[1] }
+        elseif ($out -match '"detail": "CLOSED"') { $gold = "CLOSED" }
+        elseif ($out -match '"detail": "TRADEABLE"') { $gold = "TRADEABLE" }
+        if ($gold -and $gold -ne $prev.gold) {
+            Write-Log "GOLD market-status $gold"
+            $prev.gold = $gold
         }
-        if ($out -match '"result": "BLOCKED"') {
+        if ($gold -eq "TRADEABLE" -and -not $tradeableAnnounced) {
+            $tradeableAnnounced = $true
+            Write-Host "================================="
+            Write-Host "GOLD IS TRADEABLE"
+            Write-Host "READY FOR DEMO CALIBRATION"
+            Write-Host "================================="
+            Write-Log "GOLD IS TRADEABLE READY FOR DEMO CALIBRATION (no auto start)"
+        }
+        if ($out -match "ops-preflight BLOCKED") {
             Write-Log "ERROR ops-preflight BLOCKED"
         }
     }
