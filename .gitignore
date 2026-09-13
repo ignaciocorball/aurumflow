@@ -44,3 +44,6 @@ AurumFlow.md
 # Firebase / secrets (never commit)
 service-account.json
 **/service-account.json
+.aurumflow.kill
+docs.zip
+config/demo_config.json

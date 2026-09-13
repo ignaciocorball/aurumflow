@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"aurumflow/config"
+
 	"golang.org/x/time/rate"
 )
 
@@ -40,6 +42,11 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+// NewDemoClient returns a client pinned to the Capital.com DEMO host.
+func NewDemoClient() *Client {
+	return NewClient(config.DemoAPIHost)
+}
+
 // SetSession sets the session tokens from a successful login.
 func (c *Client) SetSession(cst, securityToken string) {
 	c.CST = cst
@@ -61,6 +68,10 @@ func (c *Client) Do(ctx context.Context, method, path string, body interface{}, 
 	const maxRetries = 3
 	backoffDurations := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second}
 	var lastData []byte
+
+	if err := c.assertNotLive(path); err != nil {
+		return nil, err
+	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if err := c.limiter.Wait(ctx); err != nil {

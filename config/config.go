@@ -20,6 +20,27 @@ type Config struct {
 	DataQuality   *DataQualityConfig  `json:"data_quality" yaml:"data_quality"`
 	M5Refiner     *M5RefinerConfig    `json:"m5_refiner" yaml:"m5_refiner"`
 	Notifications *NotificationsConfig `json:"notifications" yaml:"notifications"`
+	Telemetry     *TelemetryConfig     `json:"telemetry" yaml:"telemetry"`
+	KillSwitch    *KillSwitchConfig    `json:"kill_switch" yaml:"kill_switch"`
+}
+
+// KillSwitchConfig is the local HALT_NEW_ORDERS switch (env + optional sentinel file).
+type KillSwitchConfig struct {
+	Enabled bool   `json:"enabled" yaml:"enabled"` // initial HALT_NEW_ORDERS
+	File    string `json:"file" yaml:"file"`       // if this path exists, halt new orders
+}
+
+// TelemetryConfig holds telemetry subsystem settings (e.g. Firebase RTDB for live).
+type TelemetryConfig struct {
+	Firebase *FirebaseTelemetryConfig `json:"firebase" yaml:"firebase"`
+}
+
+// FirebaseTelemetryConfig holds Firebase Realtime Database settings for live telemetry.
+type FirebaseTelemetryConfig struct {
+	Enabled             bool   `json:"enabled" yaml:"enabled"`
+	RTDBURL             string `json:"rtdb_url" yaml:"rtdb_url"`
+	ServiceAccountPath  string `json:"service_account_path" yaml:"service_account_path"`
+	InstanceID          string `json:"instance_id" yaml:"instance_id"` // optional; empty = use same as notifications in main
 }
 
 // NotificationsConfig holds notification subsystem settings (Pushover, Telegram). Optional; when nil or enabled=false, no notifications are sent.
@@ -147,23 +168,26 @@ const (
 )
 
 // APIConfig holds Capital.com API settings.
+// P1: Environment must be demo. ExecutionMode is DISABLED|DRY_RUN|DEMO. LIVE is fatal.
 type APIConfig struct {
-	Mode       string  `json:"mode" yaml:"mode"`             // "demo" or "live"; if set, BaseURL is derived
-	BaseURL    string  `json:"api_base_url" yaml:"api_base_url"`
-	APIKey     string  `json:"api_key" yaml:"api_key"`
-	Identifier string  `json:"identifier" yaml:"identifier"`
-	Password   string  `json:"password" yaml:"password"`
-	AccountID  string  `json:"account_id" yaml:"account_id"` // optional; account to operate (switch after login)
-	MaxSpread  float64 `json:"max_spread" yaml:"max_spread"` // optional; skip order if spread > this (0 = disabled)
+	Environment   string  `json:"environment" yaml:"environment"` // "demo" (required in P1). LIVE refused.
+	Mode          string  `json:"mode" yaml:"mode"`               // legacy alias of environment; LIVE refused
+	ExecutionMode string  `json:"execution_mode" yaml:"execution_mode"` // DISABLED (default), DRY_RUN, DEMO
+	BaseURL       string  `json:"api_base_url" yaml:"api_base_url"`     // ignored for host selection; LIVE URL refused
+	APIKey        string  `json:"api_key" yaml:"api_key"`
+	Identifier    string  `json:"identifier" yaml:"identifier"`
+	Password      string  `json:"password" yaml:"password"`
+	AccountID     string  `json:"account_id" yaml:"account_id"`
+	MaxSpread     float64 `json:"max_spread" yaml:"max_spread"`
 }
 
 // RiskConfig holds risk management parameters.
-// ValuePerPoint: money per 1.0 price movement per 1.0 size (stopDistance is in price units). Default 1.0 for XAUUSD 1:1; set from broker/API if available.
+// ValuePerPoint is money per 1.0 price movement per 1.0 size. 0 means unknown — do not invent 1.0.
 type RiskConfig struct {
 	RiskPerTrade       float64 `json:"risk_per_trade" yaml:"risk_per_trade"`
 	MaxTrades          int     `json:"max_trades" yaml:"max_trades"`
 	DailyDrawdownLimit float64 `json:"daily_drawdown_limit" yaml:"daily_drawdown_limit"`
-	ValuePerPoint      float64 `json:"value_per_point" yaml:"value_per_point"` // money per 1.0 price move per 1.0 size; 0 or negative => 1.0
+	ValuePerPoint      float64 `json:"value_per_point" yaml:"value_per_point"`
 }
 
 // IndicatorsConfig holds RSI and ATR parameters.
@@ -250,10 +274,45 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("parse config: %w", err)
 		}
 	}
-	if err := c.Validate(); err != nil {
+	// Historical LIVE files must refuse before env overrides can disguise them as DEMO.
+	if err := refuseIfConfigDeclaresLive(&c); err != nil {
 		return nil, err
 	}
 	c.ApplyEnvOverrides()
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// LoadOffline loads strategy/risk for file backtests. It never opens a broker session.
+// API secrets are cleared. LIVE files are allowed as research params only.
+func LoadOffline(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read config: %w", err)
+	}
+	var c Config
+	switch {
+	case strings.HasSuffix(strings.ToLower(path), ".yaml") || strings.HasSuffix(strings.ToLower(path), ".yml"):
+		if err := yaml.Unmarshal(data, &c); err != nil {
+			return nil, fmt.Errorf("parse config yaml: %w", err)
+		}
+	default:
+		if err := json.Unmarshal(data, &c); err != nil {
+			return nil, fmt.Errorf("parse config: %w", err)
+		}
+	}
+	c.API.APIKey = ""
+	c.API.Password = ""
+	c.API.Identifier = ""
+	c.API.BaseURL = ""
+	c.API.Environment = string(APIEnvDemo)
+	c.API.Mode = string(APIEnvDemo)
+	c.API.ExecutionMode = string(ExecutionDisabled)
+	if err := c.validateNonBroker(); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 
@@ -270,6 +329,12 @@ func (c *Config) ApplyEnvOverrides() {
 	}
 	if v := os.Getenv("AURUMFLOW_ACCOUNT_ID"); v != "" && c.API.AccountID == "" {
 		c.API.AccountID = v
+	}
+	if v := os.Getenv("AURUMFLOW_API_ENVIRONMENT"); v != "" {
+		c.API.Environment = v
+	}
+	if v := os.Getenv("AURUMFLOW_EXECUTION_MODE"); v != "" {
+		c.API.ExecutionMode = v
 	}
 	if c.Notifications != nil && c.Notifications.Pushover != nil {
 		if v := os.Getenv("AURUMFLOW_PUSHOVER_TOKEN"); v != "" && c.Notifications.Pushover.Token == "" {
@@ -289,36 +354,11 @@ func (c *Config) ApplyEnvOverrides() {
 	}
 }
 
-// Validate checks required fields and sets defaults.
+// Validate checks required fields and sets defaults. P1 broker lock is fail-closed.
 func (c *Config) Validate() error {
-	// Derive BaseURL from mode if set
-	switch strings.ToLower(strings.TrimSpace(c.API.Mode)) {
-	case ModeDemo:
-		c.API.Mode = ModeDemo
-		if c.API.BaseURL == "" {
-			c.API.BaseURL = "https://demo-api-capital.backend-capital.com"
-		}
-	case ModeLive:
-		c.API.Mode = ModeLive
-		if c.API.BaseURL == "" {
-			c.API.BaseURL = "https://api-capital.backend-capital.com"
-		}
-	default:
-		if c.API.Mode != "" {
-			return fmt.Errorf("config: api.mode must be %q or %q", ModeDemo, ModeLive)
-		}
+	if err := c.ApplyP1BrokerLock(); err != nil {
+		return err
 	}
-	// Coherence: if mode is live, URL must not be demo (and vice versa)
-	if c.API.Mode == ModeLive && strings.Contains(c.API.BaseURL, "demo-api") {
-		return fmt.Errorf("config: api.mode is live but api_base_url points to demo; use https://api-capital.backend-capital.com")
-	}
-	if c.API.Mode == ModeDemo && c.API.BaseURL != "" && !strings.Contains(c.API.BaseURL, "demo") && strings.Contains(c.API.BaseURL, "capital.com") {
-		c.API.BaseURL = "https://demo-api-capital.backend-capital.com"
-	}
-	if c.API.BaseURL == "" {
-		return fmt.Errorf("config: api.api_base_url is required (or set api.mode to demo/live)")
-	}
-	// Secrets can be provided by env (applied after Load via ApplyEnvOverrides)
 	if c.API.APIKey == "" && os.Getenv("AURUMFLOW_API_KEY") == "" {
 		return fmt.Errorf("config: api.api_key is required (or set AURUMFLOW_API_KEY)")
 	}
@@ -328,11 +368,16 @@ func (c *Config) Validate() error {
 	if c.API.Password == "" && os.Getenv("AURUMFLOW_PASSWORD") == "" {
 		return fmt.Errorf("config: api.password is required (or set AURUMFLOW_PASSWORD)")
 	}
+	return c.validateNonBroker()
+}
+
+func (c *Config) validateNonBroker() error {
 	if c.Risk.RiskPerTrade <= 0 {
 		c.Risk.RiskPerTrade = 0.5
 	}
-	if c.Risk.ValuePerPoint <= 0 {
-		c.Risk.ValuePerPoint = 1.0
+	// ValuePerPoint is not defaulted to 1.0 for live sizing; 0 means incomplete spec.
+	if c.Risk.ValuePerPoint < 0 {
+		c.Risk.ValuePerPoint = 0
 	}
 	if c.Risk.MaxTrades <= 0 {
 		c.Risk.MaxTrades = 3
@@ -477,6 +522,12 @@ func (c *Config) Validate() error {
 	if c.Logging.JournalDir == "" {
 		c.Logging.JournalDir = "journals"
 	}
+	// P1: journal on unless explicitly disabled via env.
+	if v := os.Getenv("AURUMFLOW_JOURNAL"); v == "0" || strings.EqualFold(v, "false") {
+		c.Logging.JournalEnabled = false
+	} else {
+		c.Logging.JournalEnabled = true
+	}
 	// Notifications: apply defaults when block is present; do not require token/user when enabled
 	if c.Notifications != nil {
 		if c.Notifications.Provider == "" {
@@ -541,6 +592,12 @@ func (c *Config) Validate() error {
 			if c.Notifications.GlobalDedup.TTLDays <= 0 {
 				c.Notifications.GlobalDedup.TTLDays = 7
 			}
+		}
+	}
+	// Telemetry: when Firebase enabled, RTDBURL is required (credentials may come from ENV)
+	if c.Telemetry != nil && c.Telemetry.Firebase != nil && c.Telemetry.Firebase.Enabled {
+		if strings.TrimSpace(c.Telemetry.Firebase.RTDBURL) == "" {
+			return fmt.Errorf("telemetry.firebase.enabled is true but rtdb_url is empty")
 		}
 	}
 	return nil

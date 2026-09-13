@@ -1,7 +1,9 @@
 {
   "api": {
-    "mode": "live",
-    "api_base_url": "https://api-capital.backend-capital.com",
+    "environment": "demo",
+    "mode": "demo",
+    "execution_mode": "disabled",
+    "api_base_url": "",
     "api_key": "",
     "identifier": "",
     "password": "",
@@ -9,9 +11,10 @@
     "max_spread": 0
   },
   "risk": {
-    "risk_per_trade": 2.5,
-    "max_trades": 3,
-    "daily_drawdown_limit": 5
+    "risk_per_trade": 0.5,
+    "max_trades": 1,
+    "daily_drawdown_limit": 2.5,
+    "value_per_point": 1.0
   },
   "indicators": {
     "rsi_period": 9,
@@ -60,8 +63,17 @@
     "reopen_warmup_m15_candles": 3,
     "block_on_data_frozen": true
   },
+  "logging": {
+    "log_dir": "logs",
+    "journal_dir": "journals",
+    "journal_enabled": true
+  },
+  "kill_switch": {
+    "enabled": false,
+    "file": ".aurumflow.kill"
+  },
   "notifications": {
-    "enabled": true,
+    "enabled": false,
     "provider": "pushover",
     "pushover": {
       "api_url": "https://api.pushover.net/1/messages.json",
@@ -69,7 +81,7 @@
       "user": ""
     },
     "telegram": {
-      "enabled": true,
+      "enabled": false,
       "bot_token": "",
       "chat_id": "",
       "parse_mode": "HTML",
@@ -79,5 +91,12 @@
       "rate_limit_per_min": 0
     },
     "queue_cap": 100
+  },
+  "telemetry": {
+    "firebase": {
+      "enabled": false,
+      "rtdb_url": "",
+      "service_account_path": "service-account.json"
+    }
   }
 }
