@@ -8,6 +8,15 @@
   "head": "4250f7b",
   "branches_reviewed": ["main", "feature/claude-code", "origin/main", "origin/feature/claude-code"],
   "p0_freeze": "READY WITH WARNINGS",
+  "p1_freeze": "READY — DEMO RUNTIME PENDING",
+  "p1": {
+    "audit_version": "1.1",
+    "live_fail_closed": true,
+    "execution_modes": ["DISABLED", "DRY_RUN", "DEMO"],
+    "demo_runtime": "BLOCKED_MISSING_DEMO_CREDENTIALS",
+    "tests_before": 66,
+    "tests_after": 117
+  },
   "languages": [
     {"name": "Go", "version": "1.24.3", "module": "aurumflow", "status": "VERIFIED_WORKING"},
     {"name": "Python", "location": "scripts/*.py", "in_git": false, "status": "IMPLEMENTED_UNVERIFIED"}
@@ -148,7 +157,8 @@
     "skip": 0,
     "vet": "PASS",
     "build": "PASS",
-    "capital_integration": "BLOCKED"
+    "capital_integration": "BLOCKED",
+    "note": "P0 baseline photograph. P1 results live in p1.tests_after / p1.demo_runtime."
   },
   "security_findings": [
     {"id": "S-001", "severity": "P0 CRITICAL", "summary": "example_config and all local configs default/use LIVE"},
@@ -170,7 +180,7 @@
   },
   "roadmap": [
     {"phase": "P0", "name": "Discovery / Freeze", "status": "COMPLETE_WITH_WARNINGS"},
-    {"phase": "P1", "name": "Execution Foundation DEMO", "status": "NOT_STARTED"},
+    {"phase": "P1", "name": "Execution Foundation DEMO", "status": "READY_DEMO_RUNTIME_PENDING"},
     {"phase": "P2", "name": "Market Data Foundation", "status": "NOT_STARTED"},
     {"phase": "P3", "name": "Institutional Radar MVP", "status": "NOT_STARTED"},
     {"phase": "P4", "name": "Options + Cross Asset", "status": "NOT_STARTED"},
@@ -197,6 +207,11 @@
     "docs/audit/15_SECURITY_AND_SECRETS.md",
     "docs/audit/16_ROADMAP.md",
     "docs/audit/17_P0_FREEZE_REPORT.md",
+    "docs/audit/18_P1_EXECUTION_FOUNDATION.md",
+    "docs/audit/19_P1_DEMO_VALIDATION.md",
+    "docs/audit/20_P1_SAFETY_MODEL.md",
+    "docs/audit/21_P1_FREEZE_REPORT.md",
+    "docs/audit/P1_LOCAL_CORPUS_MANIFEST.md",
     "docs/audit/MANIFEST.json"
   ]
 }
