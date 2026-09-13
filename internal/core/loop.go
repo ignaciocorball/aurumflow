@@ -16,6 +16,7 @@ import (
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
 	"aurumflow/internal/marketstate"
+	"aurumflow/internal/money"
 	"aurumflow/internal/notifications"
 	"aurumflow/internal/risk"
 	"aurumflow/internal/strategy"
@@ -47,6 +48,11 @@ type Loop struct {
 	Provider            execution.ExecutionProvider
 	Kill                *killswitch.Switch
 	Spec                market.InstrumentSpec
+	Money               money.MonetaryInstrumentSpec
+	RequireRuntimeMoney bool
+	UnknownPositions    int
+	Decision            *strategy.DecisionContext
+	LastSignalText      string
 	AccountID           string
 	tickCount           int
 	lastStatusLog       time.Time
@@ -640,6 +646,7 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
+	in.Context = l.Decision
 	signal, ok := strategy.SignalComposerWithZones(in, l.Config.Indicators.MinATR, l.Config.Indicators.MaxATR, l.Config.Strategy.ScoreThreshold,
 		l.Config.Strategy.RSIBuyLow, l.Config.Strategy.RSIBuyHigh, l.Config.Strategy.RSISellLow, l.Config.Strategy.RSISellHigh, l.Config.Strategy.RSIRequired, l.Config.Strategy.RSIMode)
 	diagScore, diagDir, reasons := strategy.SignalDiagnostics(in, l.Config.Indicators.MinATR, l.Config.Indicators.MaxATR, l.Config.Strategy.ScoreThreshold,
@@ -966,6 +973,21 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
+	if ok && signal != nil {
+		l.LastSignalText = signal.Direction
+	}
+	if l.UnknownPositions > 0 {
+		l.lastDecision = "rejected:" + journal.RejectUnknownPos
+		logger.Warn("skip order: %s count=%d", journal.RejectUnknownPos, l.UnknownPositions)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectUnknownPos, Direction: signal.Direction})
+		return
+	}
+	if l.RequireRuntimeMoney && l.Money.ValidationStatus != money.RuntimeValidated {
+		l.lastDecision = "rejected:" + journal.RejectInstrumentSpec
+		logger.Warn("skip order: monetary spec not strategy-executable")
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectInstrumentSpec, Direction: signal.Direction})
+		return
+	}
 	if l.Kill != nil && l.Kill.HaltNewOrders() {
 		l.lastDecision = "rejected:" + journal.RejectKillSwitch
 		logger.Warn("skip order: %s", journal.RejectKillSwitch)

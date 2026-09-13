@@ -26,6 +26,17 @@ type ComposerInput struct {
 	EntryDelayCandles int
 	ImpulseCandleIndex int // index of last strong impulse candle; 0 = none
 	SweepDiagnostics *SweepDiagnostics // optional; filled for SweepDebugLog
+	// Context is optional radar/intelligence context. Composer scoring ignores it.
+	Context *DecisionContext
+}
+
+// DecisionContext is intelligence-plane context. It must never carry broker mutation rights.
+type DecisionContext struct {
+	RadarMode  string
+	RadarState string
+	Pressure   float64
+	Confidence float64
+	BookSynced bool
 }
 
 // HasSweep returns true when a liquidity sweep is detected: either LiquidityEvent is set (canonical)
