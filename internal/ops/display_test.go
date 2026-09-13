@@ -23,8 +23,18 @@ func TestDisplayMissingNotZero(t *testing.T) {
 	}
 }
 
+func TestDecisionWhyOffHoursNotBlockWhenEligible(t *testing.T) {
+	w := DecisionWhy(Status{StrategySession: "OFF_HOURS", SessionEligible: true, SessionPolicy: "ALL", MarketStatus: "TRADEABLE", StrategyReady: true})
+	if contains(w, "STRATEGY WAITING FOR SESSION") {
+		t.Fatal(w)
+	}
+	if !containsAll(w, "Clock session", "OFF_HOURS", "Policy", "ALL", "eligible: YES") {
+		t.Fatal(w)
+	}
+}
+
 func TestDecisionWhyOffHoursSession(t *testing.T) {
-	w := DecisionWhy(Status{StrategySession: "OFF_HOURS", NextSession: "LONDON", MarketStatus: "TRADEABLE"})
+	w := DecisionWhy(Status{StrategySession: "OFF_HOURS", SessionEligible: false, NextSession: "LONDON", MarketStatus: "TRADEABLE"})
 	if !containsAll(w, "STRATEGY WAITING FOR SESSION", "LONDON") {
 		t.Fatal(w)
 	}

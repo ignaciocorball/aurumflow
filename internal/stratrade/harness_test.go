@@ -167,8 +167,11 @@ func TestOffHoursObservabilityAndNextSession(t *testing.T) {
 		t.Fatalf("%+v", on)
 	}
 	implicitAll := ObserveSession(now, nil, "TRADEABLE")
-	if !implicitAll.StrategyReady || implicitAll.NextSession == "" {
+	if !implicitAll.StrategyReady || implicitAll.ConfigPolicy != "ALL" || implicitAll.NextSession != "N/A" {
 		t.Fatalf("empty sessions follow existing CanTrade ALL semantics: %+v", implicitAll)
+	}
+	if implicitAll.StrategyWaiting == "STRATEGY WAITING FOR SESSION" {
+		t.Fatal("must not claim session block when eligible")
 	}
 }
 

@@ -76,7 +76,7 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	if !strings.Contains(html, "$300 DEMO") || !strings.Contains(html, "account_currency_risk") {
 		t.Fatal("risk units")
 	}
-	if !strings.Contains(html, "STRATEGY SESSION") || !strings.Contains(html, "OBSERVATIONAL") || !strings.Contains(html, "NOT EXECUTION INPUT") {
+	if !strings.Contains(html, "Clock session") || !strings.Contains(html, "OBSERVATIONAL") || !strings.Contains(html, "NOT EXECUTION INPUT") {
 		t.Fatal("strategy session observability")
 	}
 	for _, bad := range []string{"BUY", "SELL", "CLOSE", "FLATTEN", "CST", "X-SECURITY-TOKEN", "password", "api_key"} {

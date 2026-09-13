@@ -18,9 +18,11 @@ import (
 	"aurumflow/internal/market"
 	"aurumflow/internal/marketstate"
 	"aurumflow/internal/money"
+	"aurumflow/internal/execacct"
 	"aurumflow/internal/notifications"
 	"aurumflow/internal/risk"
 	"aurumflow/internal/strategy"
+	"aurumflow/internal/strathist"
 	"aurumflow/internal/stratrade"
 	"aurumflow/internal/telemetry"
 	"aurumflow/pkg/models"
@@ -93,6 +95,9 @@ type Loop struct {
 	LastScanAt       time.Time
 	LastSignalAt     time.Time
 	LastSignalID     string
+	History          *strathist.Book
+	HistoryReq       strathist.LegacyRequirements
+	ExecAccount      execacct.Identity
 }
 
 // NewLoop creates the event loop with wired dependencies.
@@ -220,15 +225,16 @@ func (l *Loop) tick(ctx context.Context) {
 	}
 
 	// Check trading session filter
-	if !strategy.CanTrade(now, l.Config.Strategy.TradingSessions) {
-		l.lastDecision = "waiting:OFF_HOURS"
+	sessEv := strategy.EvaluateSession(now, l.Config.Strategy.TradingSessions)
+	if !sessEv.Eligible {
+		l.lastDecision = "waiting:SESSION"
 		if l.lastIdleLog.IsZero() || time.Since(l.lastIdleLog) >= idleLogInterval {
-			l.logIdleLine("OFF_HOURS", now)
+			l.logIdleLine("SESSION", now)
 		}
 		return
 	}
 	l.LastScanAt = now
-	logger.Info("scanning for signals... [state=%s tick=%d session=%s]", currentState, l.tickCount, strategy.GetSessionInfo(now))
+	logger.Info("scanning for signals... [state=%s tick=%d clock=%s policy=%s eligible=%v]", currentState, l.tickCount, sessEv.ClockSession, sessEv.ConfigPolicy, sessEv.Eligible)
 
 	if time.Since(l.lastPing) > l.PingEvery {
 		if err := l.Client.Ping(ctx); err != nil {
@@ -248,7 +254,13 @@ func (l *Loop) tick(ctx context.Context) {
 
 	// Refresh balance of the selected account only (never accounts[0]).
 	if ar, err := l.Client.GetAccounts(ctx); err == nil {
-		acc, selErr := risk.SelectAccount(ar.Accounts, l.Config.API.AccountID, l.AccountID)
+		wantID := l.Config.API.AccountID
+		if l.ExecAccount.AccountID != "" && l.ExecAccount.MayTrade {
+			wantID = l.ExecAccount.AccountID
+		} else if l.AccountID != "" {
+			wantID = l.AccountID
+		}
+		acc, selErr := risk.SelectAccount(ar.Accounts, wantID, l.AccountID)
 		if selErr != nil {
 			logger.Warn("loop: account selection: %v", selErr)
 		} else {
@@ -340,9 +352,14 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
-	from := now.Add(-24 * time.Hour)
+	req := l.HistoryReq
+	if req.M15Required == 0 {
+		req = strathist.RequirementsFromConfig(l.Config)
+		l.HistoryReq = req
+	}
 	to := now
-	max := 200
+	from := now.Add(-req.M15Lookback)
+	max := 400
 
 	candlesM15, err := l.Client.GetPrices(ctx, l.Epic, l.Config.Timeframes.M15, max, from, to)
 	if err != nil {
@@ -350,10 +367,21 @@ func (l *Loop) tick(ctx context.Context) {
 			_ = l.ReloginFn()
 		}
 		logger.Warn("loop: get prices M15: %v", err)
-		return
+		if l.History == nil || l.History.M15Count < req.M15Required {
+			l.lastDecision = "waiting:" + strathist.HistoryFailed
+			return
+		}
+		candlesM15 = l.History.M15
 	}
-	if len(candlesM15) < 15 {
-		logger.Warn("loop: not enough M15 candles (%d)", len(candlesM15))
+	if l.History != nil {
+		l.History.MergeLive(nil, candlesM15, nil, nil, req, now)
+		if len(l.History.M15) > 0 {
+			candlesM15 = l.History.M15
+		}
+	}
+	if len(candlesM15) < req.M15Required {
+		l.lastDecision = "waiting:" + strathist.HistoryPartial
+		logger.Warn("history M15 %d/%d status=%s (no Legacy scan yet)", len(candlesM15), req.M15Required, histStatus(l.History))
 		return
 	}
 	lastM15 := candlesM15[len(candlesM15)-1].Time
@@ -414,8 +442,11 @@ func (l *Loop) tick(ctx context.Context) {
 	var lastM5 time.Time
 	m5Status := ""
 	if l.Config.M5Refiner != nil && l.Config.M5Refiner.Enabled {
-		fromM5 := now.Add(-10 * time.Hour)
-		maxM5 := 300
+		fromM5 := now.Add(-req.M5Lookback)
+		if req.M5Lookback <= 0 {
+			fromM5 = now.Add(-10 * time.Hour)
+		}
+		maxM5 := 400
 		candlesM5, err = l.Client.GetPrices(ctx, l.Epic, l.Config.Timeframes.M5, maxM5, fromM5, to)
 		if err != nil {
 			if strings.Contains(err.Error(), "401") && l.ReloginFn != nil {
@@ -448,6 +479,9 @@ func (l *Loop) tick(ctx context.Context) {
 				m5Status = "OK"
 			}
 		}
+	}
+	if l.History != nil {
+		l.History.MergeLive(candlesM5, candlesM15, nil, nil, req, now)
 	}
 
 	// Freshness check: skip signal evaluation if last candle is too old (only when market is TRADEABLE)
@@ -1011,6 +1045,12 @@ func (l *Loop) tick(ctx context.Context) {
 		l.lastDecision = "rejected:" + journal.RejectUnknownPos
 		logger.Warn("skip order: %s count=%d", journal.RejectUnknownPos, l.UnknownPositions)
 		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectUnknownPos, Direction: signal.Direction})
+		return
+	}
+	if l.ExecAccount.Resolution != "" && !l.ExecAccount.MayTrade {
+		l.lastDecision = "rejected:ACCOUNT_NOT_VERIFIED"
+		logger.Warn("skip order: execution account not explicitly verified")
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: "ACCOUNT_NOT_VERIFIED", Direction: signal.Direction})
 		return
 	}
 	if l.RequireRuntimeMoney && l.Money.ValidationStatus != money.RuntimeValidated {
@@ -1715,4 +1755,11 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func histStatus(b *strathist.Book) string {
+	if b == nil {
+		return strathist.HistoryPartial
+	}
+	return b.Status
 }

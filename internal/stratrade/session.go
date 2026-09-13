@@ -10,6 +10,9 @@ import (
 type SessionReport struct {
 	BrokerMarket     string
 	StrategySession  string
+	ConfigPolicy     string
+	Eligible         bool
+	Reason           string
 	StrategyReady    bool
 	StrategyWaiting  string
 	NextSession      string
@@ -18,30 +21,26 @@ type SessionReport struct {
 }
 
 func ObserveSession(now time.Time, allowed []string, brokerStatus string) SessionReport {
+	ev := strategy.EvaluateSession(now, allowed)
 	r := SessionReport{
 		BrokerMarket:    strings.ToUpper(strings.TrimSpace(brokerStatus)),
-		StrategySession: strategy.GetSessionInfo(now),
+		StrategySession: ev.ClockSession,
+		ConfigPolicy:    ev.ConfigPolicy,
+		Eligible:        ev.Eligible,
+		Reason:          ev.Reason,
 		Allowed:         append([]string{}, allowed...),
 	}
 	if r.BrokerMarket == "" {
 		r.BrokerMarket = "UNKNOWN"
 	}
-	can := strategy.CanTrade(now, allowed)
-	r.StrategyReady = can && (r.BrokerMarket == "TRADEABLE" || r.BrokerMarket == "ON")
-	if !can {
+	r.StrategyReady = ev.Eligible && (r.BrokerMarket == "TRADEABLE" || r.BrokerMarket == "ON")
+	if !ev.Eligible {
 		r.StrategyWaiting = "STRATEGY WAITING FOR SESSION"
 	} else if r.BrokerMarket != "TRADEABLE" && r.BrokerMarket != "ON" {
 		r.StrategyWaiting = "STRATEGY WAITING FOR BROKER"
 	} else {
 		r.StrategyWaiting = "STRATEGY WAITING"
 	}
-	nextAllowed := allowed
-	if len(nextAllowed) == 0 {
-		nextAllowed = []string{strategy.SessionAll}
-	}
-	if name, at, ok := strategy.NextSessionStart(now, nextAllowed); ok {
-		r.NextSession = name
-		r.NextSessionAt = at
-	}
+	r.NextSession, r.NextSessionAt = strategy.NextEligibleLabel(ev, now, allowed)
 	return r
 }

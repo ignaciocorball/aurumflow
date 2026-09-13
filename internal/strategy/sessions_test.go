@@ -164,3 +164,46 @@ func TestNextSessionStart(t *testing.T) {
 		t.Error("expected ok=false when allowed is empty")
 	}
 }
+
+func TestEvaluateSessionEmptyMeansAll(t *testing.T) {
+	off := time.Date(2026, 9, 13, 22, 30, 0, 0, time.UTC)
+	ev := EvaluateSession(off, nil)
+	if ev.ClockSession != "OFF_HOURS" || ev.ConfigPolicy != PolicyAll || !ev.Eligible || ev.Reason != ReasonEmptyMeansAll {
+		t.Fatalf("%+v", ev)
+	}
+	label, _ := NextEligibleLabel(ev, off, nil)
+	if label != NextEligibleNA {
+		t.Fatal(label)
+	}
+	ev = EvaluateSession(off, []string{"ALL"})
+	if !ev.Eligible || ev.Reason != ReasonPolicyAll {
+		t.Fatalf("%+v", ev)
+	}
+}
+
+func TestEvaluateSessionExplicitAndBoundaries(t *testing.T) {
+	asia := time.Date(2026, 9, 14, 3, 0, 0, 0, time.UTC)
+	if ev := EvaluateSession(asia, []string{"ASIA"}); !ev.Eligible || ev.ClockSession != SessionAsia {
+		t.Fatalf("%+v", ev)
+	}
+	londonOpen := time.Date(2026, 9, 14, 8, 0, 0, 0, time.UTC)
+	if ev := EvaluateSession(londonOpen, []string{"LONDON"}); !ev.Eligible {
+		t.Fatal("london open")
+	}
+	londonEnd := time.Date(2026, 9, 14, 17, 0, 0, 0, time.UTC)
+	if ev := EvaluateSession(londonEnd, []string{"LONDON"}); ev.Eligible {
+		t.Fatal("london end exclusive")
+	}
+	ny := time.Date(2026, 9, 14, 21, 59, 0, 0, time.UTC)
+	if ev := EvaluateSession(ny, []string{"NY"}); !ev.Eligible {
+		t.Fatal("ny")
+	}
+	multi := EvaluateSession(time.Date(2026, 9, 14, 14, 0, 0, 0, time.UTC), []string{"LONDON", "NY"})
+	if !multi.Eligible {
+		t.Fatal(multi)
+	}
+	rollover := time.Date(2026, 9, 13, 23, 30, 0, 0, time.UTC)
+	if ev := EvaluateSession(rollover, []string{"LONDON", "NY"}); ev.Eligible {
+		t.Fatal("restricted off hours")
+	}
+}

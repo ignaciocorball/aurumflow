@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"aurumflow/config"
+	"aurumflow/internal/execacct"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
-	"aurumflow/internal/risk"
 )
 
 type demoSession struct {
-	cfg    *config.Config
-	client *market.Client
-	acc    market.AccountInfo
+	cfg      *config.Config
+	client   *market.Client
+	acc      market.AccountInfo
+	Identity execacct.Identity
 }
 
 func bootstrapDemoSession(ctx context.Context, execMode config.ExecutionMode) (*demoSession, error) {
@@ -41,17 +43,39 @@ func bootstrapDemoSession(ctx context.Context, execMode config.ExecutionMode) (*
 	if err != nil {
 		return nil, fmt.Errorf("ACCOUNT FAIL: %w", err)
 	}
-	acc, err := risk.SelectDemoAccount(ar.Accounts, session.CurrentAccountID)
-	if err != nil {
-		return nil, err
+	explicit := strings.TrimSpace(os.Getenv("AURUMFLOW_DEMO_ACCOUNT_ID"))
+	if explicit == "" {
+		explicit = strings.TrimSpace(cfg.API.AccountID)
 	}
-	_ = os.Setenv("AURUMFLOW_DEMO_ACCOUNT_ID", acc.AccountID)
-	if acc.AccountID != session.CurrentAccountID {
-		if err := client.SwitchAccount(ctx, acc.AccountID); err != nil {
-			return nil, fmt.Errorf("ACCOUNT switch FAIL: %w", err)
+	ident := execacct.Resolve(ar.Accounts, explicit, "")
+	var acc market.AccountInfo
+	if ident.AccountID != "" {
+		for _, a := range ar.Accounts {
+			if a.AccountID == ident.AccountID {
+				acc = a
+				break
+			}
 		}
 	}
-	logger.Info("AUTH: PASS account=%s type=%s currency=%s balance=%.2f",
-		config.RedactAccountID(acc.AccountID), emptyDash(acc.AccountType), emptyDash(acc.Currency), acc.Balance.Balance)
-	return &demoSession{cfg: cfg, client: client, acc: acc}, nil
+	if ident.MayTrade {
+		cfg.API.AccountID = ident.AccountID
+		if acc.AccountID != "" && acc.AccountID != session.CurrentAccountID {
+			if err := client.SwitchAccount(ctx, acc.AccountID); err != nil {
+				return nil, fmt.Errorf("ACCOUNT switch FAIL: %w", err)
+			}
+		}
+		logger.Info("AUTH: PASS account=%s type=%s currency=%s status=VERIFIED",
+			execacct.Mask(ident.AccountID), emptyDash(ident.Type), emptyDash(ident.Currency))
+	} else {
+		logger.Warn("ACCOUNT %s: %s", ident.Resolution, execacct.Instruction(ident))
+		if session.CurrentAccountID != "" {
+			for _, a := range ar.Accounts {
+				if a.AccountID == session.CurrentAccountID {
+					acc = a
+					break
+				}
+			}
+		}
+	}
+	return &demoSession{cfg: cfg, client: client, acc: acc, Identity: ident}, nil
 }

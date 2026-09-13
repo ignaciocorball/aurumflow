@@ -79,6 +79,7 @@ func main() {
 	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
 	prepareUniverse := flag.Bool("prepare-demo-universe", false, "READ-ONLY prepare matrix for all resolved Capital markets (no orders)")
 	auditTrade := flag.String("audit-strategy-trade", "", "read-only reconstruct a strategy trade forensic package")
+	resolveAcct := flag.Bool("resolve-demo-account", false, "read-only DEMO account enumeration (masked ids)")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -104,6 +105,10 @@ func main() {
 	}
 	if *auditTrade != "" {
 		runAuditStrategyTrade(*auditTrade)
+		return
+	}
+	if *resolveAcct {
+		runResolveDemoAccount(context.Background())
 		return
 	}
 	if *haltOrders {

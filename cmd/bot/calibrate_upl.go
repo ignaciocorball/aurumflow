@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"aurumflow/config"
+	"aurumflow/internal/execacct"
 	"aurumflow/internal/execution"
 	"aurumflow/internal/journal"
 	"aurumflow/internal/killswitch"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
 	"aurumflow/internal/money"
-	"aurumflow/internal/risk"
 )
 
 var (
@@ -71,10 +71,9 @@ func runOneUPLCanary(ctx context.Context, epic string, spec money.MonetaryInstru
 		return res
 	}
 	if ar, aerr := client.GetAccounts(ctx); aerr == nil {
-		if acc, serr := risk.SelectDemoAccount(ar.Accounts, session.CurrentAccountID); serr == nil {
-			if acc.AccountID != session.CurrentAccountID {
-				_ = client.SwitchAccount(ctx, acc.AccountID)
-			}
+		ident := execacct.Resolve(ar.Accounts, strings.TrimSpace(os.Getenv("AURUMFLOW_DEMO_ACCOUNT_ID")), "")
+		if ident.MayTrade && ident.AccountID != session.CurrentAccountID {
+			_ = client.SwitchAccount(ctx, ident.AccountID)
 		}
 	}
 	details, err := client.GetMarketDetails(ctx, epic)
@@ -157,8 +156,16 @@ func runOneUPLCanary(ctx context.Context, epic string, spec money.MonetaryInstru
 
 	accCur := spec.Currency
 	if ar, aerr := client.GetAccounts(ctx); aerr == nil && session != nil {
-		if acc, serr := risk.SelectDemoAccount(ar.Accounts, session.CurrentAccountID); serr == nil && acc.Currency != "" {
-			accCur = acc.Currency
+		ident := execacct.Resolve(ar.Accounts, strings.TrimSpace(os.Getenv("AURUMFLOW_DEMO_ACCOUNT_ID")), "")
+		if ident.Currency != "" {
+			accCur = ident.Currency
+		} else {
+			for _, a := range ar.Accounts {
+				if a.AccountID == session.CurrentAccountID && a.Currency != "" {
+					accCur = a.Currency
+					break
+				}
+			}
 		}
 	}
 	maxD := time.Duration(calibSeconds) * time.Second

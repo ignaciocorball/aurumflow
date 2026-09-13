@@ -306,7 +306,7 @@ body.dense .ov{gap:8px}
         <div class="hero-nm">GOLD</div>
         <div class="hero-px">CLOSED</div>
         <div>Awaiting broker TRADEABLE status</div>
-        <div class="note">STRATEGY SESSION · OFF_HOURS is allowed</div>
+        <div class="note">Clock session is not the same as strategy eligibility</div>
       </div>
       <div id="gopen" hidden>
         <div class="kv" id="gexec"></div>
@@ -569,9 +569,13 @@ function paint(s){
     var ready=s.strategy_ready?'READY':(s.strategy_waiting||'STRATEGY WAITING');
     var rows=[
       ['BROKER MARKET', 'TRADEABLE'],
-      ['STRATEGY SESSION', sess],
+      ['Clock session', sess],
+      ['Policy', txt(s.session_policy)],
+      ['Strategy eligible', s.session_eligible?'YES':'NO'],
       ['STRATEGY', ready],
       ['Next session', txt(s.next_session)],
+      ['Account', txt(s.account_masked)],
+      ['History', txt(s.history_status)],
       ['Bid', num(s.gold_quotes_ok,s.gold_bid,2)],
       ['Ask', num(s.gold_quotes_ok,s.gold_ask,2)],
       ['Spread', num(s.gold_quotes_ok,s.gold_spread,3)],
@@ -597,7 +601,7 @@ function paint(s){
     el('gpos').textContent=s.position_open?posVis(s):(s.strategy_waiting||'STRATEGY WAITING');
   } else {
     el('gclosed').innerHTML='<div class="hero-nm">GOLD</div><div class="hero-px">'+(ms||'CLOSED')+'</div>'+
-      '<div>BROKER MARKET · '+(ms||'WAITING')+'</div><div class="note">STRATEGY SESSION · '+txt(s.strategy_session)+'</div>';
+      '<div>BROKER MARKET · '+(ms||'WAITING')+'</div><div class="note">Clock '+txt(s.strategy_session)+' · Policy '+txt(s.session_policy)+' · Eligible '+(s.session_eligible?'YES':'NO')+'</div>';
   }
   kv('cvdkv',[
     ['CVD', num(isNum(s.cvd)&&s.cvd!==0,s.cvd,2)],

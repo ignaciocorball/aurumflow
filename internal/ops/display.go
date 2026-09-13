@@ -59,9 +59,17 @@ func V1Rail(class string) string {
 
 func DecisionWhy(st Status) string {
 	var lines []string
-	if strings.EqualFold(st.StrategySession, "OFF_HOURS") {
+	if st.SessionEligible {
+		if st.StrategySession != "" {
+			lines = append(lines, "Clock session: "+st.StrategySession)
+		}
+		if st.SessionPolicy != "" {
+			lines = append(lines, "Policy: "+st.SessionPolicy)
+		}
+		lines = append(lines, "Strategy eligible: YES")
+	} else if strings.EqualFold(st.StrategySession, "OFF_HOURS") || st.SessionReason != "" {
 		lines = append(lines, "STRATEGY WAITING FOR SESSION")
-		if st.NextSession != "" {
+		if st.NextSession != "" && st.NextSession != "N/A" && st.NextSession != "NOW" {
 			lines = append(lines, "NEXT "+st.NextSession)
 		}
 	} else if st.MarketStatus == "TRADEABLE" && !st.StrategyReady {

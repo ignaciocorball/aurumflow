@@ -139,6 +139,23 @@ type Status struct {
 	ExpectedRisk      float64     `json:"expected_risk"`
 	HoldingSeconds    int64       `json:"holding_seconds"`
 	ObservationalNote string      `json:"observational_note"`
+	SessionPolicy     string      `json:"session_policy"`
+	SessionEligible   bool        `json:"session_eligible"`
+	SessionReason     string      `json:"session_reason"`
+	AccountMasked     string      `json:"account_masked"`
+	AccountType       string      `json:"account_type"`
+	AccountCurrency   string      `json:"account_currency"`
+	AccountVerified   string      `json:"account_verified"`
+	HistoryStatus     string      `json:"history_status"`
+	HistoryM5         string      `json:"history_m5"`
+	HistoryM15        string      `json:"history_m15"`
+	HistoryH1         string      `json:"history_h1"`
+	HistoryH4         string      `json:"history_h4"`
+	BrokerReady       bool        `json:"broker_ready"`
+	AccountReady      bool        `json:"account_ready"`
+	MonetaryReady     bool        `json:"monetary_ready"`
+	HistoryReady      bool        `json:"history_ready"`
+	RiskReady         bool        `json:"risk_ready"`
 }
 
 func NewStatus() Status {

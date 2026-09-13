@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 
 	"aurumflow/config"
 	"aurumflow/internal/core"
+	"aurumflow/internal/execacct"
 	"aurumflow/internal/execution"
 	"aurumflow/internal/exhaustion"
 	"aurumflow/internal/gates"
@@ -28,6 +30,7 @@ import (
 	"aurumflow/internal/recovery"
 	"aurumflow/internal/research"
 	"aurumflow/internal/strategy"
+	"aurumflow/internal/strathist"
 	"aurumflow/internal/stratrade"
 	"aurumflow/pkg/models"
 )
@@ -91,9 +94,18 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 		defer func() { _ = jw.Close() }()
 	}
 
+	if !sess.Identity.MayTrade {
+		logger.Warn("DEMO-WEEK account not explicitly verified — %s", execacct.Instruction(sess.Identity))
+	}
+	histReq := strathist.RequirementsFromConfig(sess.cfg)
+	histStarted := time.Now().UTC()
+	hist := strathist.Seed(ctx, sess.client, epic, histReq, histStarted)
+	logger.Info("history seed status=%s M5=%d/%d M15=%d/%d H1=%d/%d H4=%d/%d warmup=%s",
+		hist.Status, hist.M5Count, histReq.M5Required, hist.M15Count, histReq.M15Required,
+		hist.H1Count, histReq.H1Required, hist.H4Count, histReq.H4Required, time.Since(histStarted).Round(time.Millisecond))
 	gateErr := gates.DemoWeekTradeAllowed(gates.Input{
 		Environment: "demo", Host: sess.client.BaseURL, ExecutionMode: string(config.ExecutionDemo),
-		AccountOK: true, KillSwitch: ks.HaltNewOrders(), MarketStatus: details.Snapshot.MarketStatus,
+		AccountOK: sess.Identity.MayTrade, KillSwitch: ks.HaltNewOrders(), MarketStatus: details.Snapshot.MarketStatus,
 		Spec: cached, JournalOK: journalOK, DailyDDBlocked: false, DataStale: false, UnknownPositions: unknown,
 	})
 	execMode := config.ExecutionDisabled
@@ -141,6 +153,10 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	loop.UnknownPositions = unknown
 	loop.RequireRuntimeMoney = true
 	loop.Money = cached
+	loop.AccountID = sess.cfg.API.AccountID
+	loop.ExecAccount = sess.Identity
+	loop.History = &hist
+	loop.HistoryReq = histReq
 	loop.Week = week
 	loop.GitCommit = gitHead()
 	loop.StrategyVersion = "LEGACY"
@@ -266,12 +282,35 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				}
 				sessv := loop.SessionView(cur.MarketStatus)
 				cur.StrategySession = sessv.StrategySession
-				cur.StrategyReady = sessv.StrategyReady
+				cur.SessionPolicy = sessv.ConfigPolicy
+				cur.SessionEligible = sessv.Eligible
+				cur.SessionReason = sessv.Reason
 				cur.StrategyWaiting = sessv.StrategyWaiting
 				cur.NextSession = sessv.NextSession
 				if !sessv.NextSessionAt.IsZero() {
 					cur.NextSessionAt = sessv.NextSessionAt.UTC().Format(time.RFC3339)
 				}
+				cur.AccountMasked = execacct.Mask(sess.Identity.AccountID)
+				cur.AccountType = sess.Identity.Type
+				cur.AccountCurrency = sess.Identity.Currency
+				if sess.Identity.MayTrade {
+					cur.AccountVerified = "VERIFIED"
+				} else {
+					cur.AccountVerified = sess.Identity.Resolution
+				}
+				if loop.History != nil {
+					cur.HistoryStatus = loop.History.Status
+					cur.HistoryM5 = fmt.Sprintf("%d/%d", loop.History.M5Count, histReq.M5Required)
+					cur.HistoryM15 = fmt.Sprintf("%d/%d", loop.History.M15Count, histReq.M15Required)
+					cur.HistoryH1 = fmt.Sprintf("%d/%d", loop.History.H1Count, histReq.H1Required)
+					cur.HistoryH4 = fmt.Sprintf("%d/%d", loop.History.H4Count, histReq.H4Required)
+					cur.HistoryReady = loop.History.Status == strathist.HistoryReady
+				}
+				cur.BrokerReady = cur.MarketStatus == "TRADEABLE"
+				cur.AccountReady = sess.Identity.MayTrade
+				cur.MonetaryReady = cached.ValidationStatus == money.RuntimeValidated
+				cur.RiskReady = !ks.HaltNewOrders()
+				cur.StrategyReady = cur.BrokerReady && cur.AccountReady && cur.MonetaryReady && cur.HistoryReady && sessv.Eligible && cur.RiskReady
 				if !loop.LastScanAt.IsZero() {
 					cur.LastScan = loop.LastScanAt.UTC().Format(time.RFC3339)
 				}
