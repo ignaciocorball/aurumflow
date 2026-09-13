@@ -22,6 +22,7 @@ type Event struct {
 	Instrument  string
 	Seq         int64
 	Payload     any
+	Prov        Provenance
 }
 
 type Trade struct {
@@ -57,11 +58,14 @@ func OrderEvents(in []Event) []Event {
 }
 
 func eventLess(a, b Event) bool {
-	if a.Seq != 0 && b.Seq != 0 && a.Seq != b.Seq {
-		return a.Seq < b.Seq
-	}
 	if !a.EventTime.Equal(b.EventTime) {
 		return a.EventTime.Before(b.EventTime)
+	}
+	if a.Seq != b.Seq {
+		return a.Seq < b.Seq
+	}
+	if a.Provider != b.Provider {
+		return a.Provider < b.Provider
 	}
 	return a.ReceiveTime.Before(b.ReceiveTime)
 }
