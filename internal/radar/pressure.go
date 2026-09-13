@@ -3,11 +3,16 @@ package radar
 import "time"
 
 const (
-	StateNoTrade      = "NO_TRADE"
-	StateAbsorption   = "ABSORPTION"
-	StateExpansion    = "EXPANSION"
-	ModeOff           = "OFF"
-	ModeShadow        = "SHADOW"
+	StateNoTrade    = "NO_TRADE"
+	StateAbsorption = "ABSORPTION"
+	StateExpansion  = "EXPANSION"
+	ModeOff         = "OFF"
+	ModeShadow      = "SHADOW"
+
+	CapTradeFlow  uint32 = 1 << iota
+	CapBook
+	CapCrossAsset
+	CapContext
 )
 
 type Evidence struct {
@@ -28,9 +33,11 @@ type PressureSnapshot struct {
 	PersistenceScore    float64
 	VolatilityContext   float64
 	State      string
-	Confidence float64
-	Evidence   []Evidence
-	BookSynced bool
+	Confidence     float64
+	Evidence       []Evidence
+	BookSynced     bool
+	TradeFlowOnly  bool
+	Caps           uint32
 }
 
 func Compose(in PressureSnapshot) PressureSnapshot {
@@ -57,7 +64,7 @@ func Compose(in PressureSnapshot) PressureSnapshot {
 	default:
 		in.Direction = 0
 	}
-	if !in.BookSynced {
+	if !in.BookSynced && !in.TradeFlowOnly {
 		in.Confidence *= 0.25
 		in.State = StateNoTrade
 	}
