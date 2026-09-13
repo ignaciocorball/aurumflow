@@ -1,0 +1,194 @@
+[
+  {
+    "Rank": 1,
+    "Market": "GOLD",
+    "Score": 15,
+    "Coverage": 12.5,
+    "CoverageConfidence": 1.875,
+    "Tier": "IGNORE",
+    "State": {
+      "Market": "GOLD",
+      "Region": "GLOBAL",
+      "AssetClass": "PRECIOUS_METALS",
+      "PriceTrend": "UNKNOWN",
+      "RelativeStrength": "UNKNOWN",
+      "Volatility": "UNKNOWN",
+      "CapitalFlowContext": "UNKNOWN",
+      "Positioning": "CFTC managed-money observed",
+      "MacroAlignment": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "MicroAvailable": false,
+      "DataQuality": "UNKNOWN",
+      "Eligibility": "DEMO_NOT_CALIBRATED",
+      "Setup": "NONE",
+      "Attention": 0,
+      "Coverage": 0,
+      "Proposal": "",
+      "EligReason": "",
+      "Evidence": [
+        "CFTC GOLD positioning observed"
+      ],
+      "Risks": null
+    },
+    "Why": [
+      "CFTC GOLD positioning observed"
+    ],
+    "Risks": [
+      "incomplete evidence",
+      "not DEMO_ELIGIBLE"
+    ],
+    "Freshness": "WEEKLY",
+    "Components": {
+      "CapitalFlowAlignment": 0,
+      "CrossAssetConfirmation": 0,
+      "DataQuality": 0,
+      "MacroAlignment": 0,
+      "MicrostructureReadiness": 0,
+      "Momentum": 0,
+      "PositioningAsymmetry": 15,
+      "VolatilitySuitability": 0
+    }
+  },
+  {
+    "Rank": 2,
+    "Market": "SILVER",
+    "Score": 15,
+    "Coverage": 12.5,
+    "CoverageConfidence": 1.875,
+    "Tier": "IGNORE",
+    "State": {
+      "Market": "SILVER",
+      "Region": "GLOBAL",
+      "AssetClass": "PRECIOUS_METALS",
+      "PriceTrend": "UNKNOWN",
+      "RelativeStrength": "UNKNOWN",
+      "Volatility": "UNKNOWN",
+      "CapitalFlowContext": "UNKNOWN",
+      "Positioning": "CFTC silver observed",
+      "MacroAlignment": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "MicroAvailable": false,
+      "DataQuality": "UNKNOWN",
+      "Eligibility": "ANALYSIS_ONLY",
+      "Setup": "NONE",
+      "Attention": 0,
+      "Coverage": 0,
+      "Proposal": "",
+      "EligReason": "",
+      "Evidence": null,
+      "Risks": null
+    },
+    "Why": [],
+    "Risks": [
+      "incomplete evidence",
+      "not DEMO_ELIGIBLE"
+    ],
+    "Freshness": "WEEKLY",
+    "Components": {
+      "CapitalFlowAlignment": 0,
+      "CrossAssetConfirmation": 0,
+      "DataQuality": 0,
+      "MacroAlignment": 0,
+      "MicrostructureReadiness": 0,
+      "Momentum": 0,
+      "PositioningAsymmetry": 15,
+      "VolatilitySuitability": 0
+    }
+  },
+  {
+    "Rank": 3,
+    "Market": "BTC",
+    "Score": 0,
+    "Coverage": 0,
+    "CoverageConfidence": 0,
+    "Tier": "IGNORE",
+    "State": {
+      "Market": "BTC",
+      "Region": "GLOBAL",
+      "AssetClass": "CRYPTO",
+      "PriceTrend": "UNKNOWN",
+      "RelativeStrength": "UNKNOWN",
+      "Volatility": "UNKNOWN",
+      "CapitalFlowContext": "UNKNOWN",
+      "Positioning": "UNKNOWN",
+      "MacroAlignment": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "MicroAvailable": false,
+      "DataQuality": "UNKNOWN",
+      "Eligibility": "ANALYSIS_ONLY",
+      "Setup": "NONE",
+      "Attention": 0,
+      "Coverage": 0,
+      "Proposal": "",
+      "EligReason": "",
+      "Evidence": [
+        "BTC is MICROSTRUCTURE_LAB + 24/7 SENSOR"
+      ],
+      "Risks": null
+    },
+    "Why": [
+      "BTC is MICROSTRUCTURE_LAB + 24/7 SENSOR"
+    ],
+    "Risks": [
+      "incomplete evidence",
+      "not DEMO_ELIGIBLE"
+    ],
+    "Freshness": "WEEKLY",
+    "Components": {
+      "CapitalFlowAlignment": 0,
+      "CrossAssetConfirmation": 0,
+      "DataQuality": 0,
+      "MacroAlignment": 0,
+      "MicrostructureReadiness": 0,
+      "Momentum": 0,
+      "PositioningAsymmetry": 0,
+      "VolatilitySuitability": 0
+    }
+  },
+  {
+    "Rank": 4,
+    "Market": "CHINA_HK",
+    "Score": 0,
+    "Coverage": 0,
+    "CoverageConfidence": 0,
+    "Tier": "IGNORE",
+    "State": {
+      "Market": "CHINA_HK",
+      "Region": "CHINA_HONG_KONG",
+      "AssetClass": "EQUITIES",
+      "PriceTrend": "UNKNOWN",
+      "RelativeStrength": "UNKNOWN",
+      "Volatility": "UNKNOWN",
+      "CapitalFlowContext": "PENDING_PUBLIC_STRUCTURED_SOURCE",
+      "Positioning": "UNKNOWN",
+      "MacroAlignment": "UNKNOWN",
+      "CrossAsset": "UNKNOWN",
+      "MicroAvailable": false,
+      "DataQuality": "UNKNOWN",
+      "Eligibility": "ANALYSIS_ONLY",
+      "Setup": "NONE",
+      "Attention": 0,
+      "Coverage": 0,
+      "Proposal": "",
+      "EligReason": "",
+      "Evidence": null,
+      "Risks": null
+    },
+    "Why": [],
+    "Risks": [
+      "incomplete evidence",
+      "not DEMO_ELIGIBLE"
+    ],
+    "Freshness": "WEEKLY",
+    "Components": {
+      "CapitalFlowAlignment": 0,
+      "CrossAssetConfirmation": 0,
+      "DataQuality": 0,
+      "MacroAlignment": 0,
+      "MicrostructureReadiness": 0,
+      "Momentum": 0,
+      "PositioningAsymmetry": 0,
+      "VolatilitySuitability": 0
+    }
+  }
+]

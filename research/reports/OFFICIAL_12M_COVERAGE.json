@@ -1,0 +1,58 @@
+[
+  {
+    "source": "FED_H41",
+    "have": 1,
+    "want": 52,
+    "unit": "weeks",
+    "label": "1/52 weeks"
+  },
+  {
+    "source": "ICI",
+    "have": 0,
+    "want": 52,
+    "unit": "weeks",
+    "label": "0/52 weeks"
+  },
+  {
+    "source": "TIC",
+    "have": 9,
+    "want": 12,
+    "unit": "months",
+    "label": "9/12 months"
+  },
+  {
+    "source": "JPX",
+    "have": 5,
+    "want": 52,
+    "unit": "weeks",
+    "label": "5/52 weeks"
+  },
+  {
+    "source": "CBOE",
+    "have": 0,
+    "want": 252,
+    "unit": "days",
+    "label": "0/252 days"
+  },
+  {
+    "source": "ECB",
+    "have": 2,
+    "want": 52,
+    "unit": "weeks",
+    "label": "2/52 weeks"
+  },
+  {
+    "source": "BIS",
+    "have": 2,
+    "want": 4,
+    "unit": "quarters",
+    "label": "2/4 quarters"
+  },
+  {
+    "source": "CFTC",
+    "have": 1,
+    "want": 52,
+    "unit": "weeks",
+    "label": "1/52 weeks"
+  }
+]

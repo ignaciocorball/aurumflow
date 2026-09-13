@@ -69,6 +69,11 @@ func main() {
 	l2Provider := flag.String("l2-provider", "auto", "binance|okx|auto")
 	opsPreflight := flag.Bool("ops-preflight", false, "read-only Sunday/ops preflight (no broker mutation)")
 	sundayRuntime := flag.Bool("sunday-runtime", false, "supervise SHADOW intelligence + console; does not start GOLD trading")
+	worldSnap := flag.Bool("world-snapshot", false, "write CurrentWorldState from LIVE/CACHE official sources (no broker mutation)")
+	fixtureWorld := flag.Bool("fixture-world", false, "explicit test/offline fixture WorldState (never default for shadow/demo)")
+	globalShadow := flag.Bool("global-shadow", false, "multi-market SHADOW proposals from official WorldState (no orders)")
+	prepareMarket := flag.String("prepare-market", "", "READ-ONLY Capital discovery/spec for a canonical market")
+	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -122,6 +127,22 @@ func main() {
 	}
 	if *opsPreflight {
 		runOpsPreflight(context.Background())
+		return
+	}
+	if *worldSnap {
+		runWorldSnapshot(*fixtureWorld)
+		return
+	}
+	if *globalShadow {
+		runGlobalShadow(context.Background())
+		return
+	}
+	if *calibrateMarket != "" {
+		runPrepareMarket(context.Background(), *calibrateMarket, true)
+		return
+	}
+	if *prepareMarket != "" {
+		runPrepareMarket(context.Background(), *prepareMarket, false)
 		return
 	}
 	if *sundayRuntime {

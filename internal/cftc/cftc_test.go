@@ -27,3 +27,22 @@ func TestGoldIdentityAndAvailability(t *testing.T) {
 		t.Fatalf("%+v", ctx)
 	}
 }
+
+func TestExactMarketIdentityNoFuzzy(t *testing.T) {
+	if _, ok := CanonicalMarket("SILVERISH"); ok {
+		t.Fatal("fuzzy")
+	}
+	if id, ok := CanonicalMarket(SilverContract); !ok || id != "SILVER" {
+		t.Fatal(id, ok)
+	}
+	asOf := time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC)
+	avail := AvailableAt(asOf)
+	hist := []Row{{Market: SilverContract, AsOf: asOf, Available: avail, MMLong: 8, MMShort: 3, MMNet: 5}}
+	if ContextFor(hist, "GOLD", avail).Present {
+		t.Fatal("cross market")
+	}
+	got := ContextFor(hist, "SILVER", avail)
+	if !got.Present || got.MMNet != 5 {
+		t.Fatalf("%+v", got)
+	}
+}

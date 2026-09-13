@@ -46,6 +46,12 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	if !strings.Contains(html, "LIVE IMPOSSIBLE") || !strings.Contains(html, "SHADOW") {
 		t.Fatal("safety bar")
 	}
+	if !strings.Contains(html, "Global capital surface") {
+		t.Fatal("global tab")
+	}
+	if !strings.Contains(html, "Official sources") || !strings.Contains(html, "CONTEXT CALENDAR") {
+		t.Fatal("official panels")
+	}
 	for _, bad := range []string{"BUY", "SELL", "CLOSE", "FLATTEN", "CST", "X-SECURITY-TOKEN", "password", "api_key"} {
 		if strings.Contains(html, bad) && bad != "CLOSE" {
 			t.Fatalf("must not expose %s", bad)
@@ -192,7 +198,15 @@ func TestObservatoryBindingsAndStates(t *testing.T) {
 func TestAPISerializationAndSSE(t *testing.T) {
 	s := NewServer("127.0.0.1:0", NewStatus())
 	addr := waitServer(t, s)
-	for _, p := range []string{"/api/status", "/api/intelligence", "/api/book", "/api/prospective", "/api/research", "/api/timeseries", "/api/events"} {
+	postW, err := http.Post("http://"+addr+"/api/world", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	postW.Body.Close()
+	if postW.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("world mutation %d", postW.StatusCode)
+	}
+	for _, p := range []string{"/api/status", "/api/intelligence", "/api/book", "/api/prospective", "/api/research", "/api/timeseries", "/api/events", "/api/world", "/api/regions", "/api/opportunities", "/api/context/sources", "/api/institutional"} {
 		resp, err := http.Get("http://" + addr + p)
 		if err != nil {
 			t.Fatal(p, err)

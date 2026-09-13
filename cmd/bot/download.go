@@ -149,6 +149,11 @@ func runDownloadResearch(ctx context.Context, preset string, days int) {
 	opt := optionsctx.New()
 	logger.Info("OPTIONS realtime=%s historical=%s", opt.Realtime, opt.Historical)
 	_ = cat.Save(catPath)
+	if _, ranks, n, err := writeWorldReports("research/reports", false, time.Now().UTC()); err != nil {
+		logger.Warn("world reports: %v", err)
+	} else {
+		logger.Info("world reports ranks=%d hist=%d", len(ranks), n)
+	}
 	logger.Info("download preset=%s catalog=%s", preset, catPath)
 }
 

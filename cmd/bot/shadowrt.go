@@ -103,6 +103,7 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 	st.FeedFreshness = "PUBLIC_WSS_OR_REST"
 	srv := ops.NewServer(statusAddr, st)
 	go func() { _ = srv.ListenAndServe() }()
+	refreshWorld(srv, false)
 
 	bus := md.NewBus(8192)
 	go func() { _ = prov.Run(runCtx, bus) }()

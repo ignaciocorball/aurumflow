@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-13T06:55:00Z",
+  "updated_at": "2026-09-13T19:55:00Z",
   "entries": [
     {
       "spec": "FLOW_EXHAUSTION_V1",
@@ -67,6 +67,16 @@
         "PRE_2026_03_17": "UNTOUCHED_VALIDATION_CAPITAL"
       },
       "notes": "REST snapshots are resync-only. Incremental depth deltas publish. Absorption SHADOW. Console read-only on 8766. No V2."
+    },
+    {
+      "spec": "P7_GLOBAL_CAPITAL_SURFACE",
+      "status": "READY_SHADOW",
+      "promoted": false,
+      "v1_unchanged": true,
+      "datasets": {
+        "PRE_2026_03_17": "UNTOUCHED"
+      },
+      "notes": "WorldState + ATTENTION_SCORE_V1 observability. No execution. BTC is microstructure lab. GOLD demo-week inputs unchanged."
     }
   ]
 }

@@ -24,6 +24,18 @@ body{display:flex;flex-direction:column;min-height:100vh}
 .chip{color:var(--dim);white-space:nowrap}
 .chip b{color:var(--ink);font-weight:600}
 .chip.bad b{color:var(--bad)}.chip.ok b{color:var(--ok)}.chip.warn b{color:var(--warn)}
+#nav{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:#0e141c}
+#nav button{border:1px solid var(--line);background:transparent;color:var(--dim);padding:3px 10px;font:11px inherit;cursor:pointer;letter-spacing:.08em}
+#nav button.on{color:var(--ink);border-color:#4a5a72}
+.pane{display:none;flex:1;min-height:0}
+.pane.on{display:block}
+#work.pane.on{display:grid}
+#global{padding:8px;overflow:auto}
+.map{display:flex;align-items:center;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
+.map .reg{border:1px solid var(--line);padding:8px 12px;min-width:120px}
+.map .reg b{display:block}
+.heat td{padding:3px 8px;border:1px solid var(--line)}
+.pos{color:var(--ok)}.neg{color:var(--bad)}.mix{color:var(--warn)}.unk{color:var(--dim)}
 #work{flex:1;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);
   grid-template-rows:auto auto auto 1fr;gap:8px;padding:8px;min-height:0}
 .box{background:var(--panel);border:1px solid var(--line);padding:8px 10px;min-width:0}
@@ -75,7 +87,66 @@ canvas{width:100%;display:block;background:#0d1219}
   <span class="chip warn"><i class="dot warn"></i><b>SHADOW</b></span>
   <span class="chip" id="clk" style="margin-left:auto"></span>
 </header>
-<div id="work">
+<nav id="nav">
+  <button type="button" class="on" data-pane="global">GLOBAL</button>
+  <button type="button" data-pane="work">MARKETS</button>
+  <button type="button" data-pane="work">MICRO</button>
+  <button type="button" data-pane="work">EXECUTION</button>
+  <button type="button" data-pane="work">RESEARCH</button>
+</nav>
+<div id="global" class="pane on">
+  <section class="box">
+    <h2>Global capital surface</h2>
+    <div class="note">BTC is a 24/7 microstructure lab, not the primary global asset. Attention is not a trade.</div>
+    <div class="map" id="cmap">
+      <div class="reg"><span class="dot"></span><b>ASIA</b><span id="m-asia">WAITING</span></div>
+      <span>→</span>
+      <div class="reg"><span class="dot"></span><b>EUROPE</b><span id="m-eu">WAITING</span></div>
+      <span>→</span>
+      <div class="reg"><span class="dot"></span><b>UNITED STATES</b><span id="m-us">WAITING</span></div>
+    </div>
+    <div class="kv" id="gkv"></div>
+    <div class="note" id="truth">Official origin: WAITING</div>
+  </section>
+  <section class="box">
+    <h2>Official sources</h2>
+    <div class="note">LIVE OFFICIAL · CACHED OFFICIAL · UNKNOWN. Fixtures never appear here.</div>
+    <table class="heat" id="srctab"><thead><tr><th>Source</th><th>Latest published</th><th>Latest observation</th><th>Retrieved</th><th>Freshness</th><th>Origin</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section class="box">
+    <h2>CONTEXT CALENDAR</h2>
+    <div class="note">Release awareness only. Not news trading.</div>
+    <div class="kv" id="calkv"></div>
+  </section>
+  <section class="box">
+    <h2>Region cards</h2>
+    <div class="kv" id="rkv"></div>
+  </section>
+  <section class="box">
+    <h2>Asset-class heatmap</h2>
+    <table class="heat" id="heat"><thead><tr><th></th><th>Momentum</th><th>Capital Flow</th><th>Positioning</th><th>Macro</th><th>Risk</th><th>Opportunity</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section class="box">
+    <h2>Global opportunity radar</h2>
+    <div class="note">ATTENTION_SCORE_V1 — where to look, not what to buy.</div>
+    <table class="heat" id="oradar"><thead><tr><th>Rank</th><th>Market</th><th>Attention</th><th>Coverage</th><th>Legacy</th><th>Macro</th><th>Flow</th><th>Positioning</th><th>Micro</th><th>Eligibility</th><th>Proposal</th></tr></thead><tbody></tbody></table>
+    <div id="odetail" class="why">Select a market for evidence.</div>
+  </section>
+  <section class="box">
+    <h2>Capital flow</h2>
+    <div id="flows" class="kv"></div>
+  </section>
+  <section class="box">
+    <h2>Global timeline · Tokyo → Hong Kong → London → New York</h2>
+    <div id="gtl" class="note">WAITING</div>
+  </section>
+  <section class="box">
+    <h2>Institutional inspector</h2>
+    <div class="note">DELAYED — 13F is not live order direction.</div>
+    <div class="kv" id="instkv"></div>
+  </section>
+</div>
+<div id="work" class="pane">
   <section class="box" id="chartbox">
     <h2>Market</h2>
     <div class="tabs">
@@ -508,6 +579,93 @@ es.onmessage=function(ev){
     }
   }catch(e){}
 };
+var navs=document.querySelectorAll('#nav button');
+for(var ni=0;ni<navs.length;ni++) (function(b){
+  b.onclick=function(){
+    for(var j=0;j<navs.length;j++) navs[j].className='';
+    b.className='on';
+    var p=b.getAttribute('data-pane');
+    el('global').className=p==='global'?'pane on':'pane';
+    el('work').className=p==='work'?'pane on':'pane';
+    lastDraw=0; drawAll();
+  };
+})(navs[ni]);
+function cell(v){
+  v=String(v||'unknown').toLowerCase();
+  var cls='unk';
+  if(v==='inflow'||v==='up'||v==='expanding'||v==='risk_on') cls='pos';
+  else if(v==='outflow'||v==='down'||v==='contracting'||v==='risk_off') cls='neg';
+  else if(v==='mixed'||v==='transition') cls='mix';
+  return '<span class="'+cls+'">'+v+'</span>';
+}
+function paintWorld(w){
+  if(!w||w.status==='WAITING'){ el('gkv').innerHTML='<span>WorldState</span><b>WAITING</b>'; return; }
+  kv('gkv',[
+    ['Liquidity', w.Liquidity?w.Liquidity.Class:'—'],
+    ['Label', w.Liquidity?w.Liquidity.Label:'—'],
+    ['Risk', w.Risk||'—'],
+    ['USD', w.USD&&w.USD.USD?w.USD.USD:'—'],
+    ['Session', w.Session||'—'],
+    ['Confidence', w.Confidence==null?'—':String(w.Confidence)],
+    ['World valid', w.Valid||'—']
+  ]);
+  el('truth').textContent='Official origin: '+(w.Origins&&w.Origins.length?w.Origins.join(', '):'UNKNOWN')+' · '+ (w.Valid||'WAITING');
+  var R=w.Regions||{};
+  function rtxt(id,elid){
+    var x=R[id]||{}; el(elid).textContent=(x.Equity||x.Health||'WAITING');
+  }
+  rtxt('JAPAN','m-asia'); rtxt('EUROPE','m-eu'); rtxt('UNITED_STATES','m-us');
+  var rows=[];
+  ['UNITED_STATES','EUROPE','JAPAN','CHINA_HONG_KONG'].forEach(function(k){
+    var x=R[k]||{};
+    rows.push([k, (x.Equity||'—')+' · '+(x.Health||'UNKNOWN')]);
+  });
+  kv('rkv', rows);
+  var A=w.AssetClasses||{};
+  var tb=document.querySelector('#heat tbody'); tb.innerHTML='';
+  ['EQUITIES','FIXED_INCOME','FX','PRECIOUS_METALS','ENERGY','CRYPTO'].forEach(function(k){
+    var a=A[k]||{};
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+k+'</td><td>'+cell(a.Momentum)+'</td><td>'+cell(a.Flow)+'</td><td>'+cell(a.Positioning)+'</td><td>'+cell(a.Macro)+'</td><td>'+cell(a.Risk)+'</td><td>'+cell(a.Opportunity)+'</td>';
+    tb.appendChild(tr);
+  });
+  var op=w.Opportunity||[];
+  var ot=document.querySelector('#oradar tbody'); ot.innerHTML='';
+  op.forEach(function(m,i){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+(i+1)+'</td><td>'+m.Market+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Setup||'NONE')+'</td><td>'+cell(m.MacroAlignment)+'</td><td>'+cell(m.CapitalFlowContext)+'</td><td>'+cell(m.Positioning)+'</td><td>'+(m.MicroAvailable?'ready':'unavailable')+'</td><td>'+(m.Eligibility||m.EligReason||'ANALYSIS_ONLY')+'</td><td>'+(m.Proposal||'WATCH')+'</td>';
+    tr.onclick=function(){
+      el('odetail').textContent='WHY '+m.Market+'\n'+((m.Evidence||[]).join('\n'))+'\nBLOCKED: '+(m.EligReason||'none');
+    };
+    ot.appendChild(tr);
+  });
+  var fl=w.Flows||[];
+  kv('flows', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')+' '+((f.Strength||0))]}));
+  el('gtl').textContent='Session '+ (w.Session||'WAITING') +' · Tokyo → Hong Kong → London → New York';
+}
+function paintSources(j){
+  if(!j) return;
+  var cat=j.catalog||[];
+  var tb=document.querySelector('#srctab tbody');
+  if(tb){
+    tb.innerHTML='';
+    cat.forEach(function(s){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+(s.provider||'—')+'</td><td>'+(s.latest_publication||'—')+'</td><td>'+(s.latest_observation||'—')+'</td><td>'+(s.retrieved_at||'—')+'</td><td>'+(s.freshness||'—')+'</td><td>'+(s.origin||'UNKNOWN')+'</td><td>'+(s.quality||s.last_error||'—')+'</td>';
+      tb.appendChild(tr);
+    });
+  }
+  var cal=j.calendar||[];
+  kv('calkv', cal.map(function(c){return [c.Source||c.source, 'last '+(c.LastActual||c.last_actual||'—')+' · next '+(c.NextExpected||c.next_expected||'—')]}));
+}
+function loadWorld(){
+  fetch('/api/world').then(function(r){return r.json()}).then(paintWorld).catch(function(){});
+  fetch('/api/context/sources').then(function(r){return r.json()}).then(paintSources).catch(function(){});
+  fetch('/api/institutional').then(function(r){return r.json()}).then(function(j){
+    kv('instkv',[['Label', j.label||'DELAYED'],['Note', j.note||'']]);
+  }).catch(function(){});
+}
+loadWorld(); setInterval(loadWorld, 15000);
 </script>
 </body>
 </html>`

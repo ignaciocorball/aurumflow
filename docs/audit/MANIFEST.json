@@ -2,7 +2,7 @@
   "project": "institutional-trading-bot",
   "git_module": "aurumflow",
   "remote": "https://github.com/ignaciocorball/aurumflow.git",
-  "audit_version": "1.5",
+  "audit_version": "1.6",
   "audit_date": "2026-09-13",
   "branch": "feature/claude-code",
   "head": "9564dde",
@@ -19,6 +19,10 @@
   "p5_4_freeze": "READY",
   "p6_lite_freeze": "READY",
   "p6_1_freeze": "READY",
+  "p7_freeze": "READY_SHADOW",
+  "p7_1_freeze": "READY",
+  "p8_freeze": "READY_SHADOW",
+  "multi_market_demo_execution": "OFF",
   "capital_demo_execution_plane": "VERIFIED_WORKING",
   "p0_snapshot": {
     "head": "4250f7b",
@@ -119,7 +123,12 @@
     {"id": "free_data_mesh", "path": "internal/binancehist+capitalhist+secctx+finra+cftc+macro", "status": "IMPLEMENTED_TESTED"},
     {"id": "event_replay", "path": "internal/replay", "status": "IMPLEMENTED_TESTED"},
     {"id": "research_lab", "path": "internal/research", "status": "IMPLEMENTED_TESTED"},
-    {"id": "dashboard_app", "status": "NOT_IMPLEMENTED"}
+    {"id": "dashboard_app", "path": "internal/ops/console.go", "status": "IMPLEMENTED_TESTED", "note": "read-only 127.0.0.1:8766 GLOBAL observatory; official-source and calendar panels in P7.1"},
+    {"id": "worldstate", "path": "internal/worldstate", "status": "IMPLEMENTED_TESTED", "note": "production rejects FIXTURE; CURRENT_WORLD_STATE_VALID"},
+    {"id": "opportunity_surface", "path": "internal/opportunity", "status": "IMPLEMENTED_TESTED", "note": "ATTENTION_SCORE_V1 frozen; CoverageScore separate"},
+    {"id": "binance_wss", "path": "internal/binanceusdm", "status": "IMPLEMENTED_TESTED", "note": "incremental L2 BTCUSDT@depth@100ms"},
+    {"id": "portfolio_risk", "path": "internal/portfoliorisk", "status": "IMPLEMENTED_TESTED"},
+    {"id": "execution_eligibility", "path": "internal/eligibility", "status": "IMPLEMENTED_TESTED"}
   ],
   "brokers": [
     {
@@ -169,7 +178,14 @@
     {"name": "SEC EDGAR", "status": "IMPLEMENTED_TESTED", "historical": true, "note": "5 megacaps submissions+facts"},
     {"name": "FINRA OTC weekly", "status": "IMPLEMENTED_TESTED", "freshness": "SLOW_CONTEXT"},
     {"name": "CFTC COT disagg", "status": "IMPLEMENTED_TESTED", "note": "GOLD identity locked; current file thin"},
-    {"name": "FRED", "status": "PENDING_FREE_KEY"},
+    {"name": "FRED", "status": "FALLBACK_TIMEOUT", "note": "fredgraph.csv timed out from this host; H.4.1 current HTML used LIVE_OFFICIAL 2026-09-10"},
+    {"name": "FED_H41", "status": "LIVE_OFFICIAL", "note": "https://www.federalreserve.gov/releases/h41/current/h41.htm"},
+    {"name": "TIC_SLT", "status": "LIVE_OFFICIAL", "note": "latest official month 2026-06; July not published; next 2026-09-16"},
+    {"name": "ICI_weekly", "status": "HTTP_403"},
+    {"name": "CBOE_pc", "status": "HISTORICAL_FILE_ENDS_2019"},
+    {"name": "BIS_WS_GLI", "status": "LIVE_OFFICIAL"},
+    {"name": "ECB_SDMX", "status": "LIVE_OFFICIAL"},
+    {"name": "JPX_investor_type", "status": "LIVE_OFFICIAL", "note": "post-April-2026 weekly files listed; XLS values not parsed this run"},
     {"name": "CME NQ", "status": "NOT_CONNECTED"},
     {"name": "CME GC", "status": "NOT_CONNECTED"},
     {"name": "Nasdaq TotalView", "status": "NOT_CONNECTED"},
@@ -242,9 +258,10 @@
     "min_size_behavior": "REJECT_MIN_SIZE_EXCEEDS_RISK_BUDGET",
     "max_size": "IMPLEMENTED_TESTED",
     "kill_switch": "IMPLEMENTED_TESTED",
-    "correlation": "NOT_IMPLEMENTED",
-    "portfolio_futures_exposure": "NOT_IMPLEMENTED",
-    "cross_asset": "NOT_IMPLEMENTED"
+    "correlation": "IMPLEMENTED_TESTED",
+    "portfolio_futures_exposure": "IMPLEMENTED_TESTED",
+    "cross_asset": "IMPLEMENTED_TESTED",
+    "note": "P8 PortfolioRiskManager + correlation groups; multi-market DEMO still OFF"
   },
   "backtesting": {
     "candle_replay": "IMPLEMENTED_TESTED",
@@ -278,13 +295,13 @@
   "tests_current": {
     "command": "go test ./... -count=1",
     "result": "PASS",
-    "pass": 244,
+    "pass": 296,
     "fail": 0,
     "skip": 0,
     "vet": "PASS",
     "build": "PASS",
     "capital_integration": "LIFECYCLE_VERIFIED_BTCUSD",
-    "note": "Real go test ./... -count=1 on 2026-09-13 after P6.1 observatory. P0 tests.pass remains the historical photograph."
+    "note": "Real go test ./... -count=1 on 2026-09-13 after P7.1 official live mesh + P8 shadow. P0 tests.pass remains the historical photograph."
   },
   "p5_4": {
     "freeze": "READY",
@@ -404,7 +421,9 @@
     {"phase": "P4", "name": "Free Data Mesh", "status": "READY_WITH_RUNTIME_LIMITS"},
     {"phase": "P5", "name": "Historical Replay / Research", "status": "READY_RESEARCH_BASELINE"},
     {"phase": "P6", "name": "Human Decision Console", "status": "READY_P6_1_OBSERVATORY"},
-    {"phase": "P7", "name": "Controlled Automation", "status": "NOT_STARTED"}
+    {"phase": "P7", "name": "Global Capital Surface", "status": "READY_SHADOW"},
+    {"phase": "P7.1", "name": "Official Live World Mesh", "status": "READY"},
+    {"phase": "P8", "name": "Multi-Market Shadow Orchestrator", "status": "READY_SHADOW"}
   ],
   "documents": [
     "docs/audit/00_EXECUTIVE_SUMMARY.md",
@@ -464,6 +483,21 @@
     "docs/audit/54_SUNDAY_OPERATIONS.md",
     "docs/audit/55_P5_4_P6_FREEZE_REPORT.md",
     "docs/audit/56_P6_1_LIVE_TRADING_OBSERVATORY.md",
+    "docs/audit/57_P7_GLOBAL_CAPITAL_ARCHITECTURE.md",
+    "docs/audit/58_P7_WORLDSTATE.md",
+    "docs/audit/59_P7_GLOBAL_DATA_SOURCES.md",
+    "docs/audit/60_P7_REGION_ASSET_MARKET_MODEL.md",
+    "docs/audit/61_P7_OPPORTUNITY_SURFACE.md",
+    "docs/audit/62_P7_GLOBAL_UI.md",
+    "docs/audit/63_P7_FREEZE_REPORT.md",
+    "docs/audit/64_P7_1_OFFICIAL_LIVE_DATA.md",
+    "docs/audit/65_P7_1_RELEASE_CALENDAR.md",
+    "docs/audit/66_P7_1_FIXTURE_ISOLATION.md",
+    "docs/audit/67_P8_EXECUTION_ELIGIBILITY.md",
+    "docs/audit/68_P8_PORTFOLIO_RISK.md",
+    "docs/audit/69_P8_DECISION_ORCHESTRATOR.md",
+    "docs/audit/70_P8_MULTI_MARKET_SHADOW.md",
+    "docs/audit/71_P7_1_P8_FREEZE_REPORT.md",
     "docs/audit/P1_LOCAL_CORPUS_MANIFEST.md",
     "docs/audit/MANIFEST.json"
   ]

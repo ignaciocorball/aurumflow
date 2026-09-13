@@ -18,6 +18,9 @@ type Server struct {
 	timeline   []TimelineEvent
 	lastSample time.Time
 	prev       Status
+	world      []byte
+	worldAt    time.Time
+	sources    []byte
 }
 
 func NewServer(addr string, initial Status) *Server {
@@ -38,6 +41,12 @@ func NewServer(addr string, initial Status) *Server {
 	mux.HandleFunc("/api/stream", s.apiStream)
 	mux.HandleFunc("/api/timeseries", s.apiTimeseries)
 	mux.HandleFunc("/api/events", s.apiEvents)
+	mux.HandleFunc("/api/world", s.apiWorld)
+	mux.HandleFunc("/api/regions", s.apiWorldSlice("Regions"))
+	mux.HandleFunc("/api/assets", s.apiWorldSlice("AssetClasses"))
+	mux.HandleFunc("/api/opportunities", s.apiWorldSlice("Opportunity"))
+	mux.HandleFunc("/api/context/sources", s.apiSources)
+	mux.HandleFunc("/api/institutional", s.apiInstitutional)
 	s.http = &http.Server{Addr: addr, Handler: rejectMutations(mux), ReadHeaderTimeout: 5 * time.Second}
 	return s
 }

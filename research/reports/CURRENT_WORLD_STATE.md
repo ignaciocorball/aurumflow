@@ -1,0 +1,38 @@
+# CURRENT WORLD STATE
+
+AsOf: 2026-09-13T20:14:01Z
+Valid: CURRENT_WORLD_STATE_VALID
+Origins: LIVE_OFFICIAL
+Session: US
+Global liquidity: UNKNOWN (HEURISTIC_V1)
+Risk regime: MIXED
+USD: INFLOW_SUPPORT
+Rates: US=— EU=2.4
+
+## Regions
+- UNITED_STATES equity=UNKNOWN health=UNKNOWN
+- EUROPE equity=UNKNOWN health=HEALTHY
+- JAPAN equity=UNKNOWN health=UNKNOWN
+- CHINA_HONG_KONG equity=PENDING_PUBLIC_STRUCTURED_SOURCE health=UNKNOWN
+
+## Markets
+- BTC flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+- CHINA_HK flow=PENDING_PUBLIC_STRUCTURED_SOURCE pos=UNKNOWN q=UNKNOWN
+- EUROPE flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+- GOLD flow=UNKNOWN pos=CFTC managed-money observed q=UNKNOWN
+- JAPAN flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+- OIL flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+- SILVER flow=UNKNOWN pos=CFTC silver observed q=UNKNOWN
+- US100 flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+- US500 flow=UNKNOWN pos=UNKNOWN q=UNKNOWN
+
+## Attention (not a trade list)
+- #1 GOLD score=15 tier=IGNORE
+- #2 SILVER score=15 tier=IGNORE
+- #3 BTC score=0 tier=IGNORE
+- #4 CHINA_HK score=0 tier=IGNORE
+
+## Source audit
+Valid: CURRENT_WORLD_STATE_VALID
+Origins: LIVE_OFFICIAL
+Rejected fixtures: 0

@@ -55,7 +55,8 @@ func ParseDisagg(r io.Reader) ([]Row, error) {
 			continue
 		}
 		name := strings.TrimSpace(rec[0])
-		if !MatchGold(name) && !strings.Contains(strings.ToUpper(name), "GOLD - COMMODITY EXCHANGE") {
+		canon, known := CanonicalMarket(name)
+		if !known {
 			continue
 		}
 		asOf, err := time.Parse("2006-01-02", strings.TrimSpace(rec[2]))
@@ -65,7 +66,11 @@ func ParseDisagg(r io.Reader) ([]Row, error) {
 				continue
 			}
 		}
-		row := Row{Market: GoldContract, AsOf: asOf, Available: AvailableAt(asOf)}
+		market := name
+		if canon == "GOLD" {
+			market = GoldContract
+		}
+		row := Row{Market: market, AsOf: asOf, Available: AvailableAt(asOf)}
 		// Disaggregated futures-only layout (CFTC): after name/date codes,
 		// MM long/short typically sit at indices 13/14 when date is YYYY-MM-DD at [2].
 		if len(rec) > 17 {
