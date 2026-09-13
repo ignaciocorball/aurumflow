@@ -75,3 +75,67 @@ func TestSignalTimeline(t *testing.T) {
 		}
 	}
 }
+
+func TestAbsorptionTimelineDebouncesFlicker(t *testing.T) {
+	s := &Server{}
+	t0 := time.Unix(1_700_000_000, 0).UTC()
+	for i, st := range []string{"MIXED", "NOT_SUPPORTIVE", "MIXED", "NOT_SUPPORTIVE", "MIXED"} {
+		s.lastSample = time.Time{}
+		s.appendSeriesLocked(Status{AbsorptionStatus: st}, t0.Add(time.Duration(i)*time.Second))
+	}
+	for _, e := range s.timeline {
+		if e.Kind == "absorption" {
+			t.Fatalf("flicker leaked %+v", s.timeline)
+		}
+	}
+	s.lastSample = time.Time{}
+	s.appendSeriesLocked(Status{AbsorptionStatus: "NOT_SUPPORTIVE"}, t0.Add(5*time.Second))
+	s.lastSample = time.Time{}
+	s.appendSeriesLocked(Status{AbsorptionStatus: "NOT_SUPPORTIVE"}, t0.Add(10*time.Second))
+	got := 0
+	for _, e := range s.timeline {
+		if e.Kind == "absorption" && e.Text == "NOT_SUPPORTIVE" {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Fatalf("dwell emit %d %+v", got, s.timeline)
+	}
+}
+
+func TestAbsorptionTimelineMaterialImmediate(t *testing.T) {
+	s := &Server{}
+	t0 := time.Unix(1_700_000_000, 0).UTC()
+	s.appendSeriesLocked(Status{AbsorptionStatus: "MIXED"}, t0)
+	s.lastSample = time.Time{}
+	s.appendSeriesLocked(Status{AbsorptionStatus: "SUPPORTIVE"}, t0.Add(time.Second))
+	s.lastSample = time.Time{}
+	s.appendSeriesLocked(Status{AbsorptionStatus: "UNAVAILABLE"}, t0.Add(2*time.Second))
+	kinds := []string{}
+	for _, e := range s.timeline {
+		if e.Kind == "absorption" {
+			kinds = append(kinds, e.Text)
+		}
+	}
+	if len(kinds) != 2 || kinds[0] != "SUPPORTIVE" || kinds[1] != "UNAVAILABLE" {
+		t.Fatalf("%v", kinds)
+	}
+}
+
+func TestAbsorptionRawStatusUnaffected(t *testing.T) {
+	s := NewServer("127.0.0.1:0", NewStatus())
+	st := s.Get()
+	st.AbsorptionStatus = "MIXED"
+	s.Set(st)
+	st = s.Get()
+	st.AbsorptionStatus = "NOT_SUPPORTIVE"
+	s.Set(st)
+	if s.Get().AbsorptionStatus != "NOT_SUPPORTIVE" {
+		t.Fatal(s.Get().AbsorptionStatus)
+	}
+	for _, e := range s.Timeline() {
+		if e.Kind == "absorption" {
+			t.Fatalf("raw flip published %+v", s.Timeline())
+		}
+	}
+}

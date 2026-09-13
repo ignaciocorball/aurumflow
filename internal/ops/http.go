@@ -21,6 +21,9 @@ type Server struct {
 	world      []byte
 	worldAt    time.Time
 	sources    []byte
+	absShown   string
+	absPend    string
+	absPendAt  time.Time
 }
 
 func NewServer(addr string, initial Status) *Server {

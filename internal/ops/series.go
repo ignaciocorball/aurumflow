@@ -3,9 +3,10 @@ package ops
 import "time"
 
 const (
-	MaxSeriesPoints = 3600
-	MaxTimeline     = 200
-	SeriesHorizon   = time.Hour
+	MaxSeriesPoints   = 3600
+	MaxTimeline       = 200
+	SeriesHorizon     = time.Hour
+	AbsorptionDwell   = 5 * time.Second
 )
 
 type SeriesPoint struct {
@@ -67,9 +68,7 @@ func (s *Server) noteLocked(st Status, now time.Time) {
 	if st.LastV1Class != "" && st.LastV1Class != s.prev.LastV1Class {
 		push("v1", st.LastV1Class)
 	}
-	if st.AbsorptionStatus != "" && st.AbsorptionStatus != s.prev.AbsorptionStatus {
-		push("absorption", st.AbsorptionStatus)
-	}
+	s.noteAbsorptionLocked(st.AbsorptionStatus, now, push)
 	if st.LastLegacyDir != s.prev.LastLegacyDir && st.LastLegacyDir != 0 {
 		if st.LastLegacyDir > 0 {
 			push("legacy", "LEGACY LONG")
@@ -106,6 +105,40 @@ func (s *Server) noteLocked(st Status, now time.Time) {
 		push("gold", "GOLD MARKET TRADEABLE")
 	}
 	s.prev = st
+}
+
+func absorptionMaterial(status string) bool {
+	switch status {
+	case "SUPPORTIVE", "STRONGLY_SUPPORTIVE", "UNAVAILABLE":
+		return true
+	default:
+		return false
+	}
+}
+
+// noteAbsorptionLocked publishes MIXED/NOT_SUPPORTIVE flicker only after dwell.
+// Engine/status keep the raw AbsorptionStatus every tick.
+func (s *Server) noteAbsorptionLocked(cur string, now time.Time, push func(kind, text string)) {
+	if cur == "" {
+		return
+	}
+	material := absorptionMaterial(s.absShown) || absorptionMaterial(cur)
+	if cur != s.absPend {
+		s.absPend = cur
+		s.absPendAt = now
+		if material && cur != s.absShown {
+			push("absorption", cur)
+			s.absShown = cur
+		}
+		return
+	}
+	if cur == s.absShown {
+		return
+	}
+	if material || now.Sub(s.absPendAt) >= AbsorptionDwell {
+		push("absorption", cur)
+		s.absShown = cur
+	}
 }
 
 func (s *Server) Series() []SeriesPoint {

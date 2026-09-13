@@ -105,3 +105,33 @@ func TestCacheReloadStampsOfficial(t *testing.T) {
 		t.Fatal(got[0].Origin)
 	}
 }
+
+func TestNormalizedLoadDoesNotPromoteFixture(t *testing.T) {
+	dir := t.TempDir()
+	oldRaw, oldNorm := RawRoot, NormalizedRoot
+	RawRoot, NormalizedRoot = dir+"/raw", dir+"/norm"
+	defer func() { RawRoot, NormalizedRoot = oldRaw, oldNorm }()
+	now := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+	obs := StampOrigin(ParseFedH41(mustRead(t, "fed.csv"), now), worlddomain.OriginFixture, "fix")
+	if err := WriteNormalized("FED_H41", obs, CacheMeta{Provider: "FED_H41", Origin: "FIXTURE", Hash: "fix"}); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := LoadNormalized("FED_H41")
+	if err != nil || len(got) == 0 {
+		t.Fatal(err, len(got))
+	}
+	if got[0].Origin != worlddomain.OriginFixture {
+		t.Fatalf("promoted %s", got[0].Origin)
+	}
+}
+
+func TestOfficialCacheMissingIsEmptyNotFixture(t *testing.T) {
+	dir := t.TempDir()
+	oldRaw, oldNorm := RawRoot, NormalizedRoot
+	RawRoot, NormalizedRoot = dir+"/raw", dir+"/norm"
+	defer func() { RawRoot, NormalizedRoot = oldRaw, oldNorm }()
+	got := LoadOfficialCache()
+	if len(got) != 0 {
+		t.Fatalf("expected empty official cache, got %d", len(got))
+	}
+}

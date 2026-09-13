@@ -72,6 +72,44 @@ func TestCurrentWorldStateSourceAudit(t *testing.T) {
 	}
 }
 
+func TestFutureECBRejected(t *testing.T) {
+	now := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+	o := worlddomain.ContextObservation{
+		Source: "ECB", Metric: "POLICY_RATE", Value: 2.4, Present: true,
+		ObservedAt: time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC),
+		PublishedAt: time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC),
+		AvailableAt: time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC),
+		Origin: worlddomain.OriginLive,
+	}
+	ws := At(now, Input{Production: true, Observations: []worlddomain.ContextObservation{o}})
+	if ws.Rates.EUPresent {
+		t.Fatal("future ECB leaked")
+	}
+}
+
+func TestProductionEmptyIsUnknownNotFixture(t *testing.T) {
+	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	ws := At(now, Input{Production: true})
+	if ws.Valid != "CURRENT_WORLD_STATE_VALID" {
+		t.Fatal(ws.Valid)
+	}
+	if ws.Liquidity.Class != worlddomain.LiqUnknown {
+		t.Fatalf("liq %s", ws.Liquidity.Class)
+	}
+	if ws.Risk != worlddomain.RiskMixed {
+		t.Fatalf("risk %s", ws.Risk)
+	}
+	if ws.RejectedFix != 0 {
+		t.Fatal(ws.RejectedFix)
+	}
+	if g := ws.Markets["GOLD"]; g.Attention >= 80 {
+		t.Fatalf("fixture-like attention %v", g.Attention)
+	}
+	if ws.Hash == "" {
+		t.Fatal("hash")
+	}
+}
+
 func TestLiveAndCacheAccepted(t *testing.T) {
 	now := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
 	o := worlddomain.ContextObservation{

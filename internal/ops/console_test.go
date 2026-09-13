@@ -61,6 +61,12 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	if !strings.Contains(html, "data-view=\"overview\"") || !strings.Contains(html, "data-view=\"research\"") {
 		t.Fatal("navigation")
 	}
+	if !strings.Contains(html, "html,body{margin:0;height:100%;overflow:hidden") || !strings.Contains(html, "#foot{flex-shrink:0") {
+		t.Fatal("footer must stay pinned, not scroll through the stage")
+	}
+	if !strings.Contains(html, "#events{display:flex;flex-direction:column;min-height:0") || !strings.Contains(html, "#tl{flex:1;min-height:0;overflow:auto;margin:0") {
+		t.Fatal("event rail must not add a top gap or stretch the page")
+	}
 	if !strings.Contains(html, "connectSSE") || !strings.Contains(html, "MAX=3600") {
 		t.Fatal("sse reconnect / bounded series")
 	}

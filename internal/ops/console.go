@@ -24,14 +24,14 @@ const consoleHTML = `<!doctype html>
   --s4:4px; --s8:8px; --s12:12px; --s16:16px; --s24:24px; --s32:32px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:
+html,body{margin:0;height:100%;overflow:hidden;background:
   radial-gradient(1200px 600px at 12% -10%, rgba(40,70,110,.18), transparent 50%),
   radial-gradient(900px 500px at 90% 0%, rgba(40,90,80,.10), transparent 46%),
   var(--bg);
   color:var(--text-primary);
   font:13px/1.45 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;
   font-variant-numeric:tabular-nums}
-body{display:flex;flex-direction:column;min-height:100vh}
+body{display:flex;flex-direction:column}
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--unk)}
 .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
 #cmd{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;
@@ -48,20 +48,20 @@ body{display:flex;flex-direction:column;min-height:100vh}
 .saf{display:flex;justify-content:flex-end;align-items:center;gap:12px;font-size:11px;color:var(--text-secondary)}
 .pill{padding:2px 8px;border-radius:999px;border:1px solid var(--glass-border);letter-spacing:.08em}
 .pill.ok{color:var(--ok)}.pill.bad{color:var(--bad)}
-#app{flex:1;min-height:0;display:grid;grid-template-columns:88px minmax(0,1fr) 220px}
-#rail{display:flex;flex-direction:column;gap:4px;padding:12px 8px;
-  background:rgba(10,14,20,.45);border-right:1px solid var(--glass-border)}
+#app{flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:88px minmax(0,1fr) 220px;grid-template-rows:minmax(0,1fr)}
+#rail{display:flex;flex-direction:column;gap:4px;padding:8px 8px 10px;
+  min-height:0;overflow:auto;background:rgba(10,14,20,.45);border-right:1px solid var(--glass-border)}
 #rail button{border:0;background:transparent;color:var(--text-tertiary);padding:8px 6px;
   font:10px inherit;letter-spacing:.1em;cursor:pointer;text-align:left;border-radius:8px}
 #rail button.on{color:var(--text-primary);background:rgba(255,255,255,.04)}
 #rail #dens{margin-top:auto;color:var(--text-tertiary)}
 #stage{min-width:0;min-height:0;overflow:auto;padding:12px}
 .view{display:none}
-.view.on{display:block;height:100%}
-#view-overview.on{display:grid}
-.ov{height:100%;min-height:calc(100vh - 92px);display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1fr auto;gap:12px}
-.hero{grid-column:1/9;grid-row:1/3}
-.opp{grid-column:9/13;grid-row:1/3}
+.view.on{display:block}
+#view-overview.on{display:block}
+.ov{display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:auto auto;gap:12px;align-content:start}
+.hero{grid-column:1/9;grid-row:1}
+.opp{grid-column:9/13;grid-row:1 / span 3}
 .sessrot{grid-column:1/5}
 .mstate{grid-column:5/9}
 .dec{grid-column:9/13}
@@ -91,13 +91,15 @@ h2{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;c
 .sessline{position:relative;height:28px;margin:8px 0 4px;background:#10161f;border-radius:99px;overflow:hidden}
 .sessline span{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.08em;color:var(--text-tertiary)}
 .sessline .now{position:absolute;top:0;bottom:0;width:2px;background:var(--text-primary);opacity:.7}
-#events{padding:10px 10px 8px;border-left:1px solid var(--glass-border);background:rgba(10,14,20,.4);overflow:auto}
-#events h2{margin-bottom:6px}
+#events{display:flex;flex-direction:column;min-height:0;padding:8px 10px 8px;
+  border-left:1px solid var(--glass-border);background:rgba(10,14,20,.4);overflow:hidden}
+#events h2{margin:0 0 6px;flex-shrink:0}
+#tl{flex:1;min-height:0;overflow:auto;margin:0}
 #tl div{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;color:var(--text-secondary)}
 #tl .sev-warn{color:var(--warn)}#tl .sev-crit{color:var(--bad)}#tl .sev-state{color:var(--long)}
-#foot{display:flex;flex-wrap:wrap;gap:12px;padding:6px 14px;
-  border-top:1px solid var(--glass-border);background:rgba(10,14,20,.7);
-  color:var(--text-tertiary);font-size:11px}
+#foot{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:6px 14px;
+  border-top:1px solid var(--glass-border);background:rgba(10,14,20,.92);
+  color:var(--text-tertiary);font-size:11px;z-index:9}
 #foot b{color:var(--text-primary);font-weight:600}
 .hq{display:flex;gap:10px;margin-right:auto}
 .hq span{letter-spacing:.06em}
@@ -136,7 +138,7 @@ body.dense .ov{gap:8px}
   #app{grid-template-columns:72px 1fr 180px}
   .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
   .hero{grid-column:1/13;grid-row:auto}
-  .opp{grid-column:1/13}
+  .opp{grid-column:1/13;grid-row:auto}
 }
 @media (max-width:1100px){
   #app{grid-template-columns:1fr}
@@ -368,15 +370,17 @@ body.dense .ov{gap:8px}
     <span>WORLD <b id="h-wd">—</b></span>
     <span>CAPITAL <b id="h-cp">PREOPEN</b></span>
   </div>
-  <span>ev/s <b id="f-rate">—</b></span>
+  <span>events/s <b id="f-rate">—</b></span>
   <span>trades <b id="f-tr">—</b></span>
-  <span>deltas <b id="f-dlt">—</b></span>
+  <span>depth deltas <b id="f-dlt">—</b></span>
   <span>drops <b id="f-drop">—</b></span>
   <span>gaps <b id="f-gap">—</b></span>
   <span>resyncs <b id="f-rs">—</b></span>
+  <span>p50 <b id="f-p50">—</b></span>
   <span>p95 <b id="f-p95">—</b></span>
   <span>mem <b id="f-mem">—</b></span>
-  <span>last <b id="f-ev">—</b></span>
+  <span>disk <b id="f-disk">—</b></span>
+  <span>last event <b id="f-ev">—</b></span>
 </footer>
 <div id="pal">
   <input id="palq" placeholder="Open GOLD · Open BTC Micro · Show sources"/>
@@ -621,8 +625,10 @@ function paint(s){
   el('f-drop').textContent=String(s.dropped_events||0);
   el('f-gap').textContent=String(s.book_gaps||0);
   el('f-rs').textContent=String(s.resyncs||0);
+  el('f-p50').textContent=num(isNum(s.latency_p50_ms)&&s.latency_p50_ms>0,s.latency_p50_ms,1);
   el('f-p95').textContent=num(isNum(s.latency_p95_ms)&&s.latency_p95_ms>0,s.latency_p95_ms,1);
   el('f-mem').textContent=num(isNum(s.peak_mem_mb)&&s.peak_mem_mb>0,s.peak_mem_mb,1);
+  el('f-disk').textContent=num(isNum(s.collector_disk_mb)&&s.collector_disk_mb>0,s.collector_disk_mb,1);
   el('f-ev').textContent=txt(s.last_event);
   el('h-tr').textContent=s.event_rate>0?'HEALTHY':'WAITING';
   el('h-bk').textContent=s.book_synced?'SYNCED':'UNSYNCED';

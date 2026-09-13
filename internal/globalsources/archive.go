@@ -83,7 +83,9 @@ func LoadNormalized(provider string) ([]worlddomain.ContextObservation, CacheMet
 		_ = json.Unmarshal(mb, &meta)
 	}
 	for i := range obs {
-		if obs[i].Origin == "" || obs[i].Origin == worlddomain.OriginFixture {
+		// Empty origin is a legacy official-cache stamp. Fixture origin must stay
+		// fixture so production never promotes testdata into CACHE_OFFICIAL.
+		if obs[i].Origin == "" {
 			obs[i].Origin = worlddomain.OriginCache
 		}
 	}

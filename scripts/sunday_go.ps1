@@ -21,13 +21,27 @@ if (-not $env:AURUMFLOW_DEMO_API_KEY -or -not $env:AURUMFLOW_DEMO_IDENTIFIER -or
 }
 
 function Invoke-Bot([string[]]$botArgs) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     & go run ./cmd/bot @botArgs
-    if ($LASTEXITCODE -ne 0) { Fail "command failed: go run ./cmd/bot $($botArgs -join ' ')" }
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { Fail "command failed: go run ./cmd/bot $($botArgs -join ' ')" }
+}
+
+function Get-BotText([string[]]$botArgs) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $raw = & go run ./cmd/bot @botArgs 2>&1 | ForEach-Object { "$_" } | Out-String
+    $script:LastBotExit = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    return $raw
 }
 
 function Get-Preflight {
-    $raw = & go run ./cmd/bot --ops-preflight 2>&1 | Out-String
+    $raw = Get-BotText @("--ops-preflight")
     Write-Host $raw
+    if ($script:LastBotExit -ne 0) { Fail "ops-preflight exit $script:LastBotExit" }
     $jsonStart = $raw.IndexOf("{")
     if ($jsonStart -lt 0) { Fail "ops-preflight produced no JSON" }
     $json = $raw.Substring($jsonStart)
@@ -52,9 +66,9 @@ $pos = Require-Check $pf "positions" @("PASS")
 if ($pos.detail -ne "0") { Fail "open positions must be 0 (got $($pos.detail))" }
 
 Write-Host "=== 2 prepare-instrument GOLD ==="
-$prep = & go run ./cmd/bot --prepare-instrument GOLD 2>&1 | Out-String
+$prep = Get-BotText @("--prepare-instrument", "GOLD")
 Write-Host $prep
-if ($LASTEXITCODE -ne 0) { Fail "prepare-instrument GOLD" }
+if ($script:LastBotExit -ne 0) { Fail "prepare-instrument GOLD" }
 
 Write-Host "=== 3 verify GOLD TRADEABLE ==="
 if ($prep -notmatch "status=TRADEABLE" -and $prep -notmatch "market GOLD is TRADEABLE") {
@@ -67,8 +81,7 @@ $pos = Require-Check $pf "positions" @("PASS")
 if ($pos.detail -ne "0") { Fail "positions != 0 after prepare" }
 
 Write-Host "=== 5 calibrate-instrument GOLD ==="
-& go run ./cmd/bot --calibrate-instrument GOLD
-if ($LASTEXITCODE -ne 0) { Fail "calibrate-instrument GOLD" }
+Invoke-Bot @("--calibrate-instrument", "GOLD")
 
 Write-Host "=== 6-7 verify calibration closed and positions == 0 ==="
 $pf = Get-Preflight
@@ -102,5 +115,5 @@ $demoArgs = @(
     "/c", "go run ./cmd/bot --demo-week --epic GOLD --status-addr 127.0.0.1:8765"
 )
 Start-Process -FilePath "cmd.exe" -ArgumentList $demoArgs -WorkingDirectory (Get-Location)
-Write-Host "DEMO-WEEK launched on 127.0.0.1:8765 — Legacy only. Radar/Exhaustion/Absorption remain SHADOW."
+Write-Host "DEMO-WEEK launched on 127.0.0.1:8765 - Legacy only. Radar/Exhaustion/Absorption remain SHADOW."
 exit 0

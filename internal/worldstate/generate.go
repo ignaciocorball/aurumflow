@@ -33,8 +33,10 @@ func LoadResearchInput(fixtureDir, cacheDir string, now time.Time) Input {
 }
 
 func LoadOfficialInput(ctx context.Context, now time.Time) (Input, []globalsources.FetchResult) {
+	_ = now
 	obs, res := globalsources.FetchOfficial(ctx)
 	if len(obs) == 0 {
+		// Allowed fallback is last CACHE_OFFICIAL only. Never testdata fixtures.
 		obs = globalsources.LoadOfficialCache()
 	}
 	return Input{Observations: obs, Production: true}, res
