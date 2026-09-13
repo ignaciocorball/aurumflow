@@ -10,10 +10,14 @@ import (
 )
 
 type Server struct {
-	mu     sync.RWMutex
-	status Status
-	http   *http.Server
-	addr   string
+	mu         sync.RWMutex
+	status     Status
+	http       *http.Server
+	addr       string
+	series     []SeriesPoint
+	timeline   []TimelineEvent
+	lastSample time.Time
+	prev       Status
 }
 
 func NewServer(addr string, initial Status) *Server {
@@ -32,12 +36,21 @@ func NewServer(addr string, initial Status) *Server {
 	mux.HandleFunc("/api/prospective", s.apiProspective)
 	mux.HandleFunc("/api/research", s.apiResearch)
 	mux.HandleFunc("/api/stream", s.apiStream)
+	mux.HandleFunc("/api/timeseries", s.apiTimeseries)
+	mux.HandleFunc("/api/events", s.apiEvents)
 	s.http = &http.Server{Addr: addr, Handler: rejectMutations(mux), ReadHeaderTimeout: 5 * time.Second}
 	return s
 }
 
 func (s *Server) Set(st Status) {
 	s.mu.Lock()
+	st.GoldQuotesOK = GoldQuotesOK(st.MarketStatus, st.GoldBid, st.GoldAsk)
+	st.PositionOpen = st.PositionsKnown && st.OpenPositions > 0
+	st.DecisionWhy = DecisionWhy(st)
+	s.appendSeriesLocked(st, time.Now().UTC())
+	if n := len(s.timeline); n > 0 {
+		st.LastEvent = s.timeline[n-1].Text
+	}
 	s.status = st
 	s.mu.Unlock()
 }
@@ -97,13 +110,33 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 func (s *Server) apiGold(w http.ResponseWriter, _ *http.Request) {
 	st := s.Get()
-	writeJSON(w, map[string]any{
-		"market_status": st.MarketStatus, "bid": st.GoldBid, "ask": st.GoldAsk, "spread": st.GoldSpread,
-		"validation": st.GoldValidation, "session": st.GoldSession, "open_positions": st.OpenPositions,
-		"entry": st.GoldEntry, "sl": st.GoldSL, "tp": st.GoldTP, "upnl": st.GoldUPnL,
-		"daily_pnl": st.DailyPnL, "daily_dd_pct": st.DailyDDPct, "trades_today": st.TradesToday,
-		"legacy": st.LastStrategy, "kill_switch": st.KillSwitch,
-	})
+	out := map[string]any{
+		"market_status": GoldMarketLabel(st.MarketStatus),
+		"quotes_ok":     st.GoldQuotesOK,
+		"validation":    emptyNA(st.GoldValidation),
+		"session":       emptyNA(st.GoldSession),
+		"legacy":        emptyNA(st.LastStrategy),
+		"kill_switch":   st.KillSwitch,
+		"execution_started": st.ExecutionMode == "DEMO",
+	}
+	if st.GoldQuotesOK {
+		out["bid"], out["ask"], out["spread"] = st.GoldBid, st.GoldAsk, st.GoldSpread
+	}
+	if st.PositionOpen {
+		out["open_positions"] = st.OpenPositions
+		out["entry"], out["sl"], out["tp"], out["upnl"] = st.GoldEntry, st.GoldSL, st.GoldTP, st.GoldUPnL
+	}
+	if st.DemoBalanceOK {
+		out["demo_balance"] = st.DemoBalance
+	}
+	writeJSON(w, out)
+}
+
+func emptyNA(v string) string {
+	if v == "" {
+		return "WAITING"
+	}
+	return v
 }
 
 func (s *Server) apiIntel(w http.ResponseWriter, _ *http.Request) {
@@ -125,8 +158,18 @@ func (s *Server) apiBook(w http.ResponseWriter, _ *http.Request) {
 		"bid_replenishment": st.BidRepl, "ask_replenishment": st.AskRepl,
 		"bid_depletion": st.BidDepl, "ask_depletion": st.AskDepl,
 		"bid_persistence": st.BidPersist, "ask_persistence": st.AskPersist,
+		"spread": st.L2Spread, "mid": st.L2Mid, "quotes_ok": st.L2QuotesOK,
 		"basis": st.Basis, "basis_z": st.BasisZ,
+		"top_bids": st.TopBids, "top_asks": st.TopAsks,
 	})
+}
+
+func (s *Server) apiTimeseries(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]any{"points": s.Series(), "bound": MaxSeriesPoints, "horizon_s": int(SeriesHorizon.Seconds())})
+}
+
+func (s *Server) apiEvents(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]any{"events": s.Timeline(), "bound": MaxTimeline})
 }
 
 func (s *Server) apiProspective(w http.ResponseWriter, _ *http.Request) {

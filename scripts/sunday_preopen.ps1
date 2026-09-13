@@ -86,6 +86,15 @@ while ($true) {
         if ($out -match "GOLD market_status=(\w+)") { $gold = $Matches[1] }
         elseif ($out -match '"detail": "CLOSED"') { $gold = "CLOSED" }
         elseif ($out -match '"detail": "TRADEABLE"') { $gold = "TRADEABLE" }
+        if ($gold) {
+            $obs = @{
+                market_status = $gold
+                validation = "BROKER_METADATA_ONLY"
+                quotes_ok = ($gold -eq "TRADEABLE")
+                updated = (Get-Date).ToUniversalTime().ToString("o")
+            } | ConvertTo-Json
+            Set-Content -Path (Join-Path $Root "journals\gold-observatory.json") -Value $obs
+        }
         if ($gold -and $gold -ne $prev.gold) {
             Write-Log "GOLD market-status $gold"
             $prev.gold = $gold

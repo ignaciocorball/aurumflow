@@ -60,6 +60,20 @@ func runOpsPreflight(ctx context.Context) {
 				if md, err := client.GetMarketDetails(ctx, "GOLD"); err == nil && md != nil {
 					in.GoldStatus = md.Snapshot.MarketStatus
 					logger.Info("GOLD market_status=%s bid=%.2f offer=%.2f", md.Snapshot.MarketStatus, md.Snapshot.Bid, md.Snapshot.Offer)
+					obs := ops.GoldObservatory{
+						MarketStatus:  md.Snapshot.MarketStatus,
+						PositionsOK:   true,
+						OpenPositions: in.OpenPositions,
+					}
+					obs.QuotesOK = ops.GoldQuotesOK(md.Snapshot.MarketStatus, md.Snapshot.Bid, md.Snapshot.Offer)
+					if obs.QuotesOK {
+						obs.Bid, obs.Ask = md.Snapshot.Bid, md.Snapshot.Offer
+						obs.Spread = md.Snapshot.Offer - md.Snapshot.Bid
+					}
+					if spec, err := money.LoadSpec(money.CachePath("", "GOLD")); err == nil {
+						obs.Validation = spec.ValidationStatus
+					}
+					_ = ops.WriteGoldObservatory("", obs)
 				}
 				if spec, err := money.LoadSpec(money.CachePath("", "GOLD")); err == nil {
 					in.GoldMonetary = spec.ValidationStatus

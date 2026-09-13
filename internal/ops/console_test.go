@@ -73,10 +73,126 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestObservatoryBindingsAndStates(t *testing.T) {
+	st := NewStatus()
+	st.MarketStatus = "CLOSED"
+	st.GoldBid, st.GoldAsk, st.GoldSpread = 0, 0, 12
+	st.L2Spread, st.L2Mid, st.L2QuotesOK = 1.25, 100, true
+	st.BookSynced = false
+	st.L2ProxyQuality = "DEGRADED"
+	st.LatencyP95 = 612
+	st.DemoBalance = 0
+	s := NewServer("127.0.0.1:0", st)
+	s.Set(st)
+	addr := waitServer(t, s)
+
+	htmlResp, err := http.Get("http://" + addr + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	htmlb, _ := io.ReadAll(htmlResp.Body)
+	htmlResp.Body.Close()
+	html := string(htmlb)
+	if !strings.Contains(html, "l2_spread") {
+		t.Fatal("L2 spread must bind l2_spread")
+	}
+	if !strings.Contains(html, "num(l2ok(s), s.l2_spread") {
+		t.Fatal("L2 metrics must read l2_spread, not gold_spread")
+	}
+	if !strings.Contains(html, "—") || !strings.Contains(html, "WAITING") {
+		t.Fatal("missing unavailable glyphs")
+	}
+	if !strings.Contains(html, "Awaiting broker TRADEABLE") || !strings.Contains(html, "CLOSED") {
+		t.Fatal("gold closed state")
+	}
+	if !strings.Contains(html, "L2 quality") || !strings.Contains(html, "DEGRADED") {
+		t.Fatal("data quality degraded binding")
+	}
+	if !strings.Contains(html, "BOOK UNSYNCED") && !strings.Contains(html, "book_synced") {
+		t.Fatal("unsynced binding")
+	}
+	if strings.Contains(html, "BUY") || strings.Contains(html, "SELL") || strings.Contains(html, "FLATTEN") {
+		t.Fatal("mutation controls")
+	}
+	if strings.Contains(html, "password") || strings.Contains(html, "api_key") || strings.Contains(html, "CST") {
+		t.Fatal("secrets")
+	}
+
+	book, err := http.Get("http://" + addr + "/api/book")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bm map[string]any
+	if err := json.NewDecoder(book.Body).Decode(&bm); err != nil {
+		t.Fatal(err)
+	}
+	book.Body.Close()
+	if bm["spread"] != 1.25 {
+		t.Fatalf("book spread binding %+v", bm["spread"])
+	}
+
+	gold, err := http.Get("http://" + addr + "/api/gold")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gm map[string]any
+	if err := json.NewDecoder(gold.Body).Decode(&gm); err != nil {
+		t.Fatal(err)
+	}
+	gold.Body.Close()
+	if gm["market_status"] != "CLOSED" {
+		t.Fatalf("closed %v", gm["market_status"])
+	}
+	if _, ok := gm["bid"]; ok {
+		t.Fatal("closed gold must omit bid")
+	}
+	if _, ok := gm["demo_balance"]; ok {
+		t.Fatal("unavailable balance must omit numeric zero")
+	}
+
+	st.MarketStatus = "TRADEABLE"
+	st.GoldBid, st.GoldAsk = 2300, 2301
+	s.Set(st)
+	gold2, err := http.Get("http://" + addr + "/api/gold")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gm2 map[string]any
+	if err := json.NewDecoder(gold2.Body).Decode(&gm2); err != nil {
+		t.Fatal(err)
+	}
+	gold2.Body.Close()
+	if gm2["market_status"] != "TRADEABLE" || gm2["quotes_ok"] != true {
+		t.Fatalf("tradeable %+v", gm2)
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/api/stream", nil)
+	sser, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sser.Body.Close()
+	rd := bufio.NewReader(sser.Body)
+	line, err := rd.ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	var snap map[string]any
+	if err := json.Unmarshal([]byte(raw), &snap); err != nil {
+		t.Fatal(err, raw)
+	}
+	for _, k := range []string{"l2_spread", "gold_quotes_ok", "l2_quotes_ok", "decision_why", "book_synced", "l2_proxy_quality"} {
+		if _, ok := snap[k]; !ok {
+			t.Fatalf("sse schema missing %s", k)
+		}
+	}
+}
+
 func TestAPISerializationAndSSE(t *testing.T) {
 	s := NewServer("127.0.0.1:0", NewStatus())
 	addr := waitServer(t, s)
-	for _, p := range []string{"/api/status", "/api/intelligence", "/api/book", "/api/prospective", "/api/research"} {
+	for _, p := range []string{"/api/status", "/api/intelligence", "/api/book", "/api/prospective", "/api/research", "/api/timeseries", "/api/events"} {
 		resp, err := http.Get("http://" + addr + p)
 		if err != nil {
 			t.Fatal(p, err)

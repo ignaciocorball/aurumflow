@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"aurumflow/internal/logger"
 	"aurumflow/internal/md"
 	"aurumflow/internal/microflow"
+	"aurumflow/internal/money"
 	"aurumflow/internal/okxswap"
 	"aurumflow/internal/ops"
 	"aurumflow/internal/radar"
@@ -117,6 +119,7 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 	var latSum float64
 	started := time.Now()
 	var pending []candles.Trade
+	diskTick := 0
 	var m1 []models.Candle
 	seenLegacy := map[string]bool{}
 	tick := time.NewTicker(time.Second)
@@ -196,6 +199,7 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 					pending = pending[len(pending)-1:]
 				}
 			}
+			newLegacy := 0
 			if len(m1) > 80 {
 				m15 := research.Resample(m1, 15*time.Minute)
 				h1 := research.Resample(m1, time.Hour)
@@ -211,6 +215,7 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 					ab := absorption.Observe(v1s, dd.Available, 0, bookfeatures.Response(sig.Direction, dd, ll))
 					_ = rt.RecordProspective(sig.Time, sig.Direction, sig.Score, v1s.PressureScore, v1s, rt.Micro.Snapshot(sig.Time), dd, ll, ab)
 					seenLegacy[id] = true
+					newLegacy = sig.Direction
 				}
 			}
 			mf := rt.Micro.Snapshot(now)
@@ -275,7 +280,19 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 			cur.L2Relation = relation
 			cur.L2ProxyQuality = pq.Quality
 			cur.Microprice = d.Microprice
+			cur.L2Spread = d.Spread
+			cur.L2Mid = d.Mid
+			cur.L2QuotesOK = d.Available
 			cur.Imb1, cur.Imb5, cur.Imb10, cur.Imb20 = d.Imb1, d.Imb5, d.Imb10, d.Imb20
+			cur.CVD = rs.CVD
+			if w, ok := mf.Windows["30s"]; ok {
+				cur.AggBuy, cur.AggSell = w.BuyQty, w.SellQty
+			}
+			if bk != nil {
+				bids, asks := bk.CopyTop(15)
+				cur.TopBids = levelsFromMap(bids, true)
+				cur.TopAsks = levelsFromMap(asks, false)
+			}
 			cur.BidRepl, cur.AskRepl = liq.BidReplenishment, liq.AskReplenishment
 			cur.BidDepl, cur.AskDepl = liq.BidDepletion, liq.AskDepletion
 			cur.BidPersist, cur.AskPersist = liq.BidPersistence, liq.AskPersistence
@@ -322,6 +339,45 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 				cur.BookCapability = "BOOK_SYNCED"
 			} else {
 				cur.BookCapability = "BOOK_CAPABILITY_LIMITED"
+			}
+			if up := ops.AgeSeconds(started); up > 0 {
+				cur.EventRate = float64(rt.Metrics.Events) / float64(up)
+			}
+			var ms runtime.MemStats
+			runtime.ReadMemStats(&ms)
+			cur.PeakMemMB = float64(ms.Alloc) / 1024 / 1024
+			cur.Trades = rt.Metrics.Trades
+			_, drop := bus.Stats()
+			cur.Drops = drop
+			if newLegacy != 0 {
+				cur.LastLegacyDir = newLegacy
+				if newLegacy > 0 {
+					cur.LastStrategy = "LONG"
+				} else {
+					cur.LastStrategy = "SHORT"
+				}
+			}
+			if g, ok := ops.ReadGoldObservatory(""); ok {
+				cur.MarketStatus = g.MarketStatus
+				if g.Validation != "" {
+					cur.GoldValidation = g.Validation
+				}
+				if g.QuotesOK {
+					cur.GoldBid, cur.GoldAsk, cur.GoldSpread = g.Bid, g.Ask, g.Spread
+				}
+				if g.DemoBalanceOK {
+					cur.DemoBalance, cur.DemoBalanceOK = g.DemoBalance, true
+				}
+				if g.PositionsOK {
+					cur.PositionsKnown = true
+					cur.OpenPositions = g.OpenPositions
+				}
+			} else if spec, err := money.LoadSpec(money.CachePath("", "GOLD")); err == nil {
+				cur.GoldValidation = spec.ValidationStatus
+			}
+			diskTick++
+			if diskTick%15 == 1 {
+				cur.DiskMB = dirSizeMB("data/live")
 			}
 			srv.Set(cur)
 		}
@@ -375,6 +431,44 @@ func appendUnique(xs []string, v string) []string {
 		}
 	}
 	return append(xs, v)
+}
+
+func levelsFromMap(m map[float64]float64, highFirst bool) []ops.BookLevel {
+	type kv struct{ p, q float64 }
+	xs := make([]kv, 0, len(m))
+	for p, q := range m {
+		xs = append(xs, kv{p, q})
+	}
+	for i := 1; i < len(xs); i++ {
+		j := i
+		for j > 0 {
+			less := xs[j].p < xs[j-1].p
+			if highFirst {
+				less = xs[j].p > xs[j-1].p
+			}
+			if !less {
+				break
+			}
+			xs[j], xs[j-1] = xs[j-1], xs[j]
+			j--
+		}
+	}
+	out := make([]ops.BookLevel, len(xs))
+	for i, x := range xs {
+		out[i] = ops.BookLevel{Price: x.p, Qty: x.q}
+	}
+	return out
+}
+
+func dirSizeMB(root string) float64 {
+	var n int64
+	_ = filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
+		if err == nil && info != nil && !info.IsDir() {
+			n += info.Size()
+		}
+		return nil
+	})
+	return float64(n) / 1024 / 1024
 }
 
 func evidenceLine(ab absorption.Snapshot) string {

@@ -112,6 +112,19 @@ type Status struct {
 	ExhStrong         int     `json:"exh_strongly_supportive"`
 	ContL2            int     `json:"continuation_with_l2"`
 	Alerts            []string `json:"alerts,omitempty"`
+	L2Spread          float64  `json:"l2_spread"`
+	L2Mid             float64  `json:"l2_mid"`
+	L2QuotesOK        bool     `json:"l2_quotes_ok"`
+	GoldQuotesOK      bool     `json:"gold_quotes_ok"`
+	DemoBalanceOK     bool     `json:"demo_balance_ok"`
+	PositionOpen      bool     `json:"position_open"`
+	PeakMemMB         float64  `json:"peak_mem_mb"`
+	TopBids           []BookLevel `json:"top_bids,omitempty"`
+	TopAsks           []BookLevel `json:"top_asks,omitempty"`
+	DecisionWhy       string      `json:"decision_why"`
+	LastEvent         string      `json:"last_event"`
+	PositionsKnown    bool        `json:"positions_known"`
+	Trades            int64       `json:"trades"`
 }
 
 func NewStatus() Status {

@@ -221,6 +221,7 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				cur.ProspectiveExh = pst.Exhaustion
 				if pr, err := sess.client.GetPositions(runCtx); err == nil {
 					cur.OpenPositions = len(pr.Positions)
+					cur.PositionsKnown = true
 				}
 				srv.Set(cur)
 			}

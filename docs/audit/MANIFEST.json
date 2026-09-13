@@ -18,6 +18,7 @@
   "p5_3_freeze": "READY",
   "p5_4_freeze": "READY",
   "p6_lite_freeze": "READY",
+  "p6_1_freeze": "READY",
   "capital_demo_execution_plane": "VERIFIED_WORKING",
   "p0_snapshot": {
     "head": "4250f7b",
@@ -277,13 +278,13 @@
   "tests_current": {
     "command": "go test ./... -count=1",
     "result": "PASS",
-    "pass": 238,
+    "pass": 244,
     "fail": 0,
     "skip": 0,
     "vet": "PASS",
     "build": "PASS",
     "capital_integration": "LIFECYCLE_VERIFIED_BTCUSD",
-    "note": "Real go test ./... -count=1 on 2026-09-13 after P5.4. P0 tests.pass remains the historical photograph."
+    "note": "Real go test ./... -count=1 on 2026-09-13 after P6.1 observatory. P0 tests.pass remains the historical photograph."
   },
   "p5_4": {
     "freeze": "READY",
@@ -402,7 +403,7 @@
     {"phase": "P3", "name": "Institutional Radar MVP", "status": "READY_SHADOW_MVP"},
     {"phase": "P4", "name": "Free Data Mesh", "status": "READY_WITH_RUNTIME_LIMITS"},
     {"phase": "P5", "name": "Historical Replay / Research", "status": "READY_RESEARCH_BASELINE"},
-    {"phase": "P6", "name": "Human Decision Console", "status": "NOT_STARTED"},
+    {"phase": "P6", "name": "Human Decision Console", "status": "READY_P6_1_OBSERVATORY"},
     {"phase": "P7", "name": "Controlled Automation", "status": "NOT_STARTED"}
   ],
   "documents": [
@@ -462,6 +463,7 @@
     "docs/audit/53_P6_LITE_DECISION_CONSOLE.md",
     "docs/audit/54_SUNDAY_OPERATIONS.md",
     "docs/audit/55_P5_4_P6_FREEZE_REPORT.md",
+    "docs/audit/56_P6_1_LIVE_TRADING_OBSERVATORY.md",
     "docs/audit/P1_LOCAL_CORPUS_MANIFEST.md",
     "docs/audit/MANIFEST.json"
   ]
