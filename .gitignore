@@ -32,7 +32,15 @@ logs/
 /bk_backtesting
 /bots
 /config/config.json
+/config/bk_config.json
 /scripts
 /.cursor
+/docs/*
+!/docs/audit/
+!/docs/audit/**
 /logs
 AurumFlow.md
+
+# Firebase / secrets (never commit)
+service-account.json
+**/service-account.json

@@ -1,0 +1,202 @@
+{
+  "project": "institutional-trading-bot",
+  "git_module": "aurumflow",
+  "remote": "https://github.com/ignaciocorball/aurumflow.git",
+  "audit_version": "1.0",
+  "audit_date": "2026-09-12",
+  "branch": "feature/claude-code",
+  "head": "4250f7b",
+  "branches_reviewed": ["main", "feature/claude-code", "origin/main", "origin/feature/claude-code"],
+  "p0_freeze": "READY WITH WARNINGS",
+  "languages": [
+    {"name": "Go", "version": "1.24.3", "module": "aurumflow", "status": "VERIFIED_WORKING"},
+    {"name": "Python", "location": "scripts/*.py", "in_git": false, "status": "IMPLEMENTED_UNVERIFIED"}
+  ],
+  "entrypoints": [
+    {"path": "cmd/bot/main.go", "role": "live_loop_and_backtest_cli", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"path": "scripts/run.ps1", "in_git": false, "status": "IMPLEMENTED_UNVERIFIED"},
+    {"path": "scripts/backtest_runner.py", "in_git": false, "status": "IMPLEMENTED_UNVERIFIED"}
+  ],
+  "components": [
+    {"id": "market_client", "path": "internal/market", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "WRAP"},
+    {"id": "execution", "path": "internal/execution", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "WRAP"},
+    {"id": "risk", "path": "internal/risk", "status": "PARTIAL", "reuse": "KEEP_AND_REFACTOR"},
+    {"id": "state_machine", "path": "internal/core/state.go", "status": "VERIFIED_WORKING", "reuse": "KEEP_AND_REFACTOR"},
+    {"id": "loop", "path": "internal/core/loop.go", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "REWRITE"},
+    {"id": "strategy_composer", "path": "internal/strategy", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "KEEP"},
+    {"id": "structure", "path": "internal/structure", "status": "VERIFIED_WORKING", "reuse": "KEEP"},
+    {"id": "indicators", "path": "internal/indicators", "status": "VERIFIED_WORKING", "reuse": "KEEP"},
+    {"id": "sessions", "path": "internal/strategy/sessions.go", "status": "VERIFIED_WORKING", "reuse": "KEEP"},
+    {"id": "backtest", "path": "internal/backtest", "status": "PARTIAL", "reuse": "KEEP_AND_REFACTOR"},
+    {"id": "journal", "path": "internal/journal", "status": "PARTIAL", "reuse": "KEEP"},
+    {"id": "logger", "path": "internal/logger", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "KEEP"},
+    {"id": "notifications", "path": "internal/notifications", "status": "IMPLEMENTED_UNVERIFIED", "reuse": "KEEP_AND_REFACTOR"},
+    {"id": "telemetry_firebase", "path": "internal/telemetry", "in_git": false, "status": "IMPLEMENTED_UNVERIFIED", "reuse": "WRAP"},
+    {"id": "websocket_streaming", "status": "NOT_IMPLEMENTED"},
+    {"id": "position_close", "status": "NOT_IMPLEMENTED"},
+    {"id": "execution_mode_enum", "status": "NOT_IMPLEMENTED"},
+    {"id": "kill_switch", "status": "NOT_IMPLEMENTED"},
+    {"id": "order_flow", "status": "NOT_IMPLEMENTED"},
+    {"id": "dashboard_app", "status": "NOT_IMPLEMENTED"}
+  ],
+  "brokers": [
+    {
+      "name": "Capital.com",
+      "type": "CFD_REST",
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "auth": "IMPLEMENTED_UNVERIFIED",
+      "market_data": "IMPLEMENTED_UNVERIFIED",
+      "streaming": "NOT_IMPLEMENTED",
+      "orders": "IMPLEMENTED_UNVERIFIED",
+      "positions_read": "IMPLEMENTED_UNVERIFIED",
+      "positions_close": "NOT_IMPLEMENTED",
+      "demo_runtime": "UNKNOWN",
+      "local_configs_mode": "live",
+      "endpoints": [
+        "POST /api/v1/session",
+        "GET /api/v1/session",
+        "PUT /api/v1/session",
+        "GET /api/v1/ping",
+        "GET /api/v1/accounts",
+        "GET /api/v1/markets",
+        "GET /api/v1/markets/{epic}",
+        "GET /api/v1/prices/{epic}",
+        "GET /api/v1/positions",
+        "POST /api/v1/positions",
+        "GET /api/v1/confirms/{dealReference}"
+      ]
+    }
+  ],
+  "data_sources": [
+    {"name": "Capital.com REST OHLC", "realtime": "poll_60s", "historical": true, "used": true, "status": "IMPLEMENTED_UNVERIFIED"},
+    {"name": "local JSON/CSV candles", "realtime": false, "historical": true, "used": true, "in_git": "lab_only", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"name": "Firebase RTDB", "role": "telemetry_sink", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"name": "Redis", "role": "notification_dedup", "status": "IMPLEMENTED_UNVERIFIED"}
+  ],
+  "strategies": [
+    {
+      "name": "AurumFlow Composer",
+      "path": "internal/strategy/composer.go",
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "can_signal": true,
+      "can_execute": true,
+      "has_tests": true,
+      "has_backtest": true,
+      "connected_risk": true,
+      "connected_broker": true
+    }
+  ],
+  "instruments": [
+    {"id": "GOLD", "class": "capital_cfd_commodity", "status": "IMPLEMENTED_UNVERIFIED", "notes": "default ResolveEpic gold"},
+    {"id": "XAUUSD", "class": "alias_or_epic", "status": "PARTIAL", "notes": "README name; bots/xauusd uses GOLD"},
+    {"id": "US100", "class": "capital_cfd_index", "status": "IMPLEMENTED_UNVERIFIED", "not": "NQ"},
+    {"id": "US500", "class": "capital_cfd_index", "status": "IMPLEMENTED_UNVERIFIED", "not": "ES"},
+    {"id": "US30", "class": "capital_cfd_index", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"id": "ETHUSD", "class": "capital_cfd_crypto", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"id": "MSFT", "class": "capital_cfd_stock", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"id": "SILVER", "class": "capital_cfd_commodity", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"id": "NDAQ", "class": "capital_cfd_stock", "status": "PARTIAL", "notes": "not Nasdaq-100"},
+    {"id": "MNQ1", "class": "unknown_local_folder", "status": "UNKNOWN"},
+    {"id": "NQ", "status": "NOT_IMPLEMENTED"},
+    {"id": "GC", "status": "NOT_IMPLEMENTED"},
+    {"id": "QQQ", "status": "NOT_IMPLEMENTED"},
+    {"id": "SPX", "status": "NOT_IMPLEMENTED"},
+    {"id": "ES", "status": "NOT_IMPLEMENTED"}
+  ],
+  "execution": {
+    "modes_enum": "NOT_IMPLEMENTED",
+    "demo_host_supported": true,
+    "live_confirm_env": "AURUMFLOW_LIVE_CONFIRM",
+    "live_confirm_bypass_if_mode_empty": true,
+    "open": "IMPLEMENTED_UNVERIFIED",
+    "close": "NOT_IMPLEMENTED",
+    "update": "NOT_IMPLEMENTED",
+    "dry_run": "NOT_IMPLEMENTED",
+    "default_example_mode": "live"
+  },
+  "risk": {
+    "risk_per_trade": "IMPLEMENTED_UNVERIFIED",
+    "max_trades": "PARTIAL",
+    "daily_drawdown": "PARTIAL",
+    "kill_switch": "NOT_IMPLEMENTED",
+    "correlation": "NOT_IMPLEMENTED",
+    "account_selection_bug": true
+  },
+  "backtesting": {
+    "candle_replay": "IMPLEMENTED_UNVERIFIED",
+    "tick_replay": "NOT_IMPLEMENTED",
+    "walk_forward": "NOT_IMPLEMENTED",
+    "monte_carlo": "NOT_IMPLEMENTED",
+    "costs_default_zero": true,
+    "statistically_reliable": false,
+    "local_corpus": true
+  },
+  "storage": [
+    {"kind": "json_config", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"kind": "file_logs", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"kind": "jsonl_journal", "status": "PARTIAL"},
+    {"kind": "candle_files", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"kind": "redis_optional", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"kind": "firebase_rtdb_optional", "status": "IMPLEMENTED_UNVERIFIED"},
+    {"kind": "sql", "status": "NOT_IMPLEMENTED"}
+  ],
+  "tests": {
+    "command": "go test ./... -count=1",
+    "result": "PASS",
+    "pass": 66,
+    "fail": 0,
+    "skip": 0,
+    "vet": "PASS",
+    "build": "PASS",
+    "capital_integration": "BLOCKED"
+  },
+  "security_findings": [
+    {"id": "S-001", "severity": "P0 CRITICAL", "summary": "example_config and all local configs default/use LIVE"},
+    {"id": "S-002", "severity": "P0 CRITICAL", "summary": "LIVE_CONFIRM bypass when api.mode empty"},
+    {"id": "S-003", "severity": "P1 HIGH", "summary": "Capital + Pushover + Telegram + Firebase credentials present locally, not in git"},
+    {"id": "S-004", "severity": "P1 HIGH", "summary": "bot READMEs claim no inline secrets; files contain them"}
+  ],
+  "blockers": [
+    {"id": "B-001", "severity": "P0 CRITICAL", "summary": "No local DEMO config; cannot safely prove Capital.com this workstation"},
+    {"id": "B-002", "severity": "P0 CRITICAL", "summary": "Live default + confirm bypass"},
+    {"id": "B-003", "severity": "P1 HIGH", "summary": "No position close/update"},
+    {"id": "B-004", "severity": "P1 HIGH", "summary": "No EXECUTION_MODE / kill switch"},
+    {"id": "B-005", "severity": "P1 HIGH", "summary": "Operational corpus gitignored"}
+  ],
+  "radar": {
+    "readiness_pct": 14,
+    "pressure_score_inputs_pct": 18,
+    "justification": "Candle SMC + Capital CFD execution only; no book/options/futures identity"
+  },
+  "roadmap": [
+    {"phase": "P0", "name": "Discovery / Freeze", "status": "COMPLETE_WITH_WARNINGS"},
+    {"phase": "P1", "name": "Execution Foundation DEMO", "status": "NOT_STARTED"},
+    {"phase": "P2", "name": "Market Data Foundation", "status": "NOT_STARTED"},
+    {"phase": "P3", "name": "Institutional Radar MVP", "status": "NOT_STARTED"},
+    {"phase": "P4", "name": "Options + Cross Asset", "status": "NOT_STARTED"},
+    {"phase": "P5", "name": "Historical Replay / Research", "status": "NOT_STARTED"},
+    {"phase": "P6", "name": "Human Decision Console", "status": "NOT_STARTED"},
+    {"phase": "P7", "name": "Controlled Automation", "status": "NOT_STARTED"}
+  ],
+  "documents": [
+    "docs/audit/00_EXECUTIVE_SUMMARY.md",
+    "docs/audit/01_REPOSITORY_INVENTORY.md",
+    "docs/audit/02_CURRENT_ARCHITECTURE.md",
+    "docs/audit/03_CAPITAL_COM_AUDIT.md",
+    "docs/audit/04_STRATEGY_INVENTORY.md",
+    "docs/audit/05_MARKET_DATA_SOURCES.md",
+    "docs/audit/06_EXECUTION_ENGINE.md",
+    "docs/audit/07_RISK_ENGINE.md",
+    "docs/audit/08_BACKTESTING_AND_RESEARCH.md",
+    "docs/audit/09_OBSERVABILITY.md",
+    "docs/audit/10_STORAGE_AND_DATA.md",
+    "docs/audit/11_TEST_AND_BUILD_BASELINE.md",
+    "docs/audit/12_REUSE_MATRIX.md",
+    "docs/audit/13_INSTITUTIONAL_RADAR_GAP_ANALYSIS.md",
+    "docs/audit/14_TECHNICAL_DEBT.md",
+    "docs/audit/15_SECURITY_AND_SECRETS.md",
+    "docs/audit/16_ROADMAP.md",
+    "docs/audit/17_P0_FREEZE_REPORT.md",
+    "docs/audit/MANIFEST.json"
+  ]
+}
