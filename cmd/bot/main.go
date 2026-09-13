@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -14,13 +15,18 @@ import (
 
 	"aurumflow/config"
 	"aurumflow/internal/backtest"
-	"github.com/google/uuid"
 	"aurumflow/internal/core"
+	"aurumflow/internal/execution"
 	"aurumflow/internal/journal"
+	"aurumflow/internal/killswitch"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
 	"aurumflow/internal/notifications"
+	"aurumflow/internal/risk"
+	"aurumflow/internal/telemetry"
 	"aurumflow/pkg/models"
+
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -31,6 +37,9 @@ func main() {
 	backtestDir := flag.String("backtest-dir", "backtesting", "directory to save/load backtest JSON files")
 	backtestOutdir := flag.String("backtest-outdir", "", "if set, write journal and CSV under this dir (jsonl/ and csv/ subdirs) instead of candles dir")
 	backtestForce := flag.Bool("backtest-force", false, "re-download even if backtest file already exists")
+	flatten := flag.Bool("flatten", false, "close DEMO positions for the configured epic (requires --flatten-confirm or interactive FLATTEN-DEMO)")
+	flattenConfirm := flag.Bool("flatten-confirm", false, "required non-interactive confirmation for --flatten")
+	canaryRO := flag.Bool("canary-readonly", false, "DEMO read-only Capital.com probe (requires AURUMFLOW_DEMO_* env, never LIVE secrets)")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -42,6 +51,10 @@ func main() {
 		runBacktest(*backtestPath, cfg, "")
 		return
 	}
+	if *canaryRO {
+		runReadOnlyCanary(context.Background())
+		return
+	}
 
 	ctx := context.Background()
 	configPath := "config/config.json"
@@ -50,9 +63,18 @@ func main() {
 	}
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		logger.Error("load config: %v", err)
+		logger.Error("%v", err)
+		if strings.Contains(err.Error(), "LIVE") || strings.Contains(err.Error(), "STARTUP REFUSED") {
+			logger.Error("FATAL: LIVE broker access is disabled in P1.")
+		}
 		os.Exit(1)
 	}
+	if config.IsLiveCapitalHost(cfg.API.BaseURL) || strings.EqualFold(cfg.API.Environment, "live") || strings.EqualFold(cfg.API.Mode, "live") {
+		logger.Error("FATAL: LIVE broker access is disabled in P1.")
+		os.Exit(1)
+	}
+	botTag := telemetry.ExtractBotTag(configPath)
+	botTagNormalized := telemetry.NormalizeBotTag(botTag)
 	logDir := os.Getenv("AURUMFLOW_LOG_DIR")
 	if logDir == "" {
 		logDir = cfg.Logging.LogDir
@@ -64,54 +86,62 @@ func main() {
 		logger.Warn("log file disabled: %v", err)
 	}
 	defer logger.CloseFile()
-	logger.Info("config loaded from %s (mode=%s)", configPath, cfg.API.Mode)
+	logger.Info("config loaded from %s (environment=%s execution_mode=%s)", configPath, cfg.API.Environment, cfg.ExecMode())
 
-	client := market.NewClient(cfg.API.BaseURL)
+	ksCfgEnabled := cfg.KillSwitch != nil && cfg.KillSwitch.Enabled
+	ksFile := ""
+	if cfg.KillSwitch != nil {
+		ksFile = cfg.KillSwitch.File
+	}
+	ks := killswitch.New(ksCfgEnabled, ksFile)
+
+	epicHint := os.Getenv("AURUMFLOW_EPIC")
+	if epicHint == "" {
+		epicHint = "(resolve gold)"
+	}
+	printStartupBanner(cfg, epicHint, config.RedactAccountID(cfg.API.AccountID), ks.HaltNewOrders())
+
+	if *flatten {
+		epic := os.Getenv("AURUMFLOW_EPIC")
+		if epic == "" {
+			epic = "GOLD"
+		}
+		runFlatten(ctx, cfg, epic, *flattenConfirm)
+		return
+	}
+
+	client := market.NewDemoClient()
+	if config.IsLiveCapitalHost(client.BaseURL) {
+		logger.Error("FATAL: LIVE broker access is disabled in P1.")
+		os.Exit(1)
+	}
 	client.APIKey = cfg.API.APIKey
 	session, err := client.CreateSession(ctx, cfg.API.Identifier, cfg.API.Password)
 	if err != nil {
 		logger.Error("create session: %v", err)
 		os.Exit(1)
 	}
-	logger.Info("session created, currentAccountId=%s", session.CurrentAccountID)
+	logger.Info("session created, currentAccountId=%s", config.RedactAccountID(session.CurrentAccountID))
 
-	// List all accounts at startup
-	for i, acc := range session.Accounts {
-		marker := ""
-		if acc.AccountID == session.CurrentAccountID {
-			marker = " (current)"
-		}
-		logger.Info("account[%d] id=%s balance=%.2f available=%.2f%s",
-			i, acc.AccountID, acc.Balance.Balance, acc.Balance.Available, marker)
-	}
-
-	// Switch to configured account if set
 	if cfg.API.AccountID != "" && cfg.API.AccountID != session.CurrentAccountID {
 		if err := client.SwitchAccount(ctx, cfg.API.AccountID); err != nil {
-			logger.Error("switch account to %s: %v", cfg.API.AccountID, err)
+			logger.Error("switch account to %s: %v", config.RedactAccountID(cfg.API.AccountID), err)
 			os.Exit(1)
 		}
-		logger.Info("switched to account %s", cfg.API.AccountID)
-		// Re-fetch session/accounts for balance of switched account
+		logger.Info("switched to account %s", config.RedactAccountID(cfg.API.AccountID))
 		if ar, err := client.GetAccounts(ctx); err == nil {
-			for _, acc := range ar.Accounts {
-				if acc.AccountID == cfg.API.AccountID {
-					session.CurrentAccountID = acc.AccountID
-					session.Accounts = ar.Accounts
-					break
-				}
-			}
+			session.Accounts = ar.Accounts
 		}
 	}
 
-	var balance float64
-	for _, acc := range session.Accounts {
-		if acc.AccountID == session.CurrentAccountID {
-			balance = acc.Balance.Balance
-			logger.Info("balance=%.2f available=%.2f", acc.Balance.Balance, acc.Balance.Available)
-			break
-		}
+	selected, err := risk.SelectAccount(session.Accounts, cfg.API.AccountID, session.CurrentAccountID)
+	if err != nil {
+		logger.Error("%v", err)
+		os.Exit(1)
 	}
+	session.CurrentAccountID = selected.AccountID
+	balance := selected.Balance.Balance
+	logger.Info("selected account=%s balance=%.2f available=%.2f", config.RedactAccountID(selected.AccountID), selected.Balance.Balance, selected.Balance.Available)
 
 	epic := os.Getenv("AURUMFLOW_EPIC")
 	if epic == "" {
@@ -125,9 +155,20 @@ func main() {
 		logger.Info("using epic from env: %s", epic)
 	}
 
+	var instrumentSpec market.InstrumentSpec
 	if details, err := client.GetMarketDetails(ctx, epic); err == nil {
 		logger.Info("market %s: minDealSize=%.2f maxDealSize=%.2f",
 			details.Instrument.Epic, details.DealingRules.MinDealSize.Value, details.DealingRules.MaxDealSize.Value)
+		if spec, sErr := market.SpecFromDetails(details, cfg.Risk.ValuePerPoint); sErr != nil {
+			logger.Warn("instrument spec: %v", sErr)
+		} else {
+			instrumentSpec = spec
+			if !spec.SizingComplete() {
+				logger.Warn("INSTRUMENT_SPEC_INCOMPLETE: trading mutations will be blocked until min/max/step and value_per_point are known")
+			}
+		}
+	} else {
+		logger.Warn("GetMarketDetails: %v", err)
 	}
 
 	chileLoc, _ := time.LoadLocation("America/Santiago")
@@ -222,10 +263,10 @@ func main() {
 		return nil
 	}
 
-	liveConfirmRequired := cfg.API.Mode == config.ModeLive && (os.Getenv("AURUMFLOW_LIVE_CONFIRM") != "1" && os.Getenv("AURUMFLOW_LIVE_CONFIRM") != "true")
-
 	instanceID := epic
-	if cfg.Notifications != nil && cfg.Notifications.InstanceID != "" {
+	if botTag != "" {
+		instanceID = fmt.Sprintf("%s-%s", epic, botTag)
+	} else if cfg.Notifications != nil && cfg.Notifications.InstanceID != "" {
 		instanceID = cfg.Notifications.InstanceID
 	}
 	runID := uuid.New().String()
@@ -271,9 +312,31 @@ func main() {
 	loop := core.NewLoop(cfg, client, epic, balance, openCount)
 	loop.InstanceID = instanceID
 	loop.RunID = runID
+	loop.BotTag = botTag
+	loop.BotTagNormalized = botTagNormalized
 	loop.ReloginFn = reloginFn
-	loop.LiveConfirmRequired = liveConfirmRequired
+	loop.LiveConfirmRequired = false
 	loop.NotifEmitter = notifEmitter
+	loop.Kill = ks
+	loop.Spec = instrumentSpec
+	loop.AccountID = selected.AccountID
+	if instrumentSpec.MinDealSize > 0 {
+		loop.Exec.MinSize = instrumentSpec.MinDealSize
+		loop.Exec.SizeStep = instrumentSpec.SizeStep
+	}
+	if cfg.ExecMode() == config.ExecutionDryRun {
+		loop.Provider = &execution.DryRunProvider{Inner: loop.Exec}
+	}
+
+	if cfg.Telemetry != nil && cfg.Telemetry.Firebase != nil && cfg.Telemetry.Firebase.Enabled {
+		livePub, err := telemetry.NewLivePublisher(ctx, cfg.Telemetry.Firebase)
+		if err != nil {
+			logger.Warn("telemetry.firebase disabled: %v", err)
+		} else {
+			loop.Telemetry = livePub
+			logger.Info("telemetry.firebase enabled for RTDB")
+		}
+	}
 
 	if cfg.Logging.JournalEnabled {
 		jpath := filepath.Join(cfg.Logging.JournalDir, "trades.jsonl")
@@ -310,7 +373,7 @@ func loadConfigForBacktest() *config.Config {
 	if p := os.Getenv("AURUMFLOW_CONFIG"); p != "" {
 		configPath = p
 	}
-	cfg, err := config.Load(configPath)
+	cfg, err := config.LoadOffline(configPath)
 	if err != nil {
 		logger.Error("load config: %v", err)
 		os.Exit(1)
@@ -355,43 +418,43 @@ func runBacktest(path string, cfg *config.Config, outDir string) {
 		}
 	}
 	btCfg := backtest.Config{
-		RSIPeriod:            cfg.Indicators.RSIPeriod,
-		ATRPeriod:            cfg.Indicators.ATRPeriod,
-		MinATR:               cfg.Indicators.MinATR,
-		MaxATR:               cfg.Indicators.MaxATR,
-		SwingLookback:        cfg.Strategy.SwingLookback,
-		EntryDelayCandles:    cfg.Strategy.EntryDelayCandles,
-		ScoreThreshold:       cfg.Strategy.ScoreThreshold,
-		RiskPerTrade:         cfg.Risk.RiskPerTrade,
-		RSIRequired:          cfg.Strategy.RSIRequired,
-		RSIMode:               cfg.Strategy.RSIMode,
-		RSIBuyLow:             cfg.Strategy.RSIBuyLow,
-		RSIBuyHigh:           cfg.Strategy.RSIBuyHigh,
-		RSISellLow:            cfg.Strategy.RSISellLow,
-		RSISellHigh:           cfg.Strategy.RSISellHigh,
-		SweepCloseTolerance:  cfg.Strategy.SweepCloseTolerance,
-		SweepMinPenetration:  cfg.Strategy.SweepMinPenetration,
-		SweepMinWickRatio:    cfg.Strategy.SweepMinWickRatio,
-		UseH1Filter:          cfg.Strategy.UseH1Filter,
-		BlockH1Range:         cfg.Strategy.BlockH1Range,
-		Crypto:               cfg.Strategy.Crypto,
-		H1RangeExtraScore:    cfg.Strategy.H1RangeExtraScore,
-		H1SwingLookback:      cfg.Strategy.H1SwingLookback,
-		UseH4Filter:          cfg.Strategy.UseH4Filter,
-		BlockH4Range:         cfg.Strategy.BlockH4Range,
-		H4SwingLookback:      cfg.Strategy.H4SwingLookback,
-		UseRSIWilder:         cfg.Indicators.UseRSIWilder,
-		ValuePerPoint:        cfg.Risk.ValuePerPoint,
-		MaxTrades:            cfg.Risk.MaxTrades,
-		StateTTLCandles:      cfg.Strategy.StateTTLCandles,
+		RSIPeriod:                     cfg.Indicators.RSIPeriod,
+		ATRPeriod:                     cfg.Indicators.ATRPeriod,
+		MinATR:                        cfg.Indicators.MinATR,
+		MaxATR:                        cfg.Indicators.MaxATR,
+		SwingLookback:                 cfg.Strategy.SwingLookback,
+		EntryDelayCandles:             cfg.Strategy.EntryDelayCandles,
+		ScoreThreshold:                cfg.Strategy.ScoreThreshold,
+		RiskPerTrade:                  cfg.Risk.RiskPerTrade,
+		RSIRequired:                   cfg.Strategy.RSIRequired,
+		RSIMode:                       cfg.Strategy.RSIMode,
+		RSIBuyLow:                     cfg.Strategy.RSIBuyLow,
+		RSIBuyHigh:                    cfg.Strategy.RSIBuyHigh,
+		RSISellLow:                    cfg.Strategy.RSISellLow,
+		RSISellHigh:                   cfg.Strategy.RSISellHigh,
+		SweepCloseTolerance:           cfg.Strategy.SweepCloseTolerance,
+		SweepMinPenetration:           cfg.Strategy.SweepMinPenetration,
+		SweepMinWickRatio:             cfg.Strategy.SweepMinWickRatio,
+		UseH1Filter:                   cfg.Strategy.UseH1Filter,
+		BlockH1Range:                  cfg.Strategy.BlockH1Range,
+		Crypto:                        cfg.Strategy.Crypto,
+		H1RangeExtraScore:             cfg.Strategy.H1RangeExtraScore,
+		H1SwingLookback:               cfg.Strategy.H1SwingLookback,
+		UseH4Filter:                   cfg.Strategy.UseH4Filter,
+		BlockH4Range:                  cfg.Strategy.BlockH4Range,
+		H4SwingLookback:               cfg.Strategy.H4SwingLookback,
+		UseRSIWilder:                  cfg.Indicators.UseRSIWilder,
+		ValuePerPoint:                 cfg.Risk.ValuePerPoint,
+		MaxTrades:                     cfg.Risk.MaxTrades,
+		StateTTLCandles:               cfg.Strategy.StateTTLCandles,
 		InvalidateOnOppositeStructure: cfg.Strategy.InvalidateOnOppositeStructure,
-		BlockLondonNYOverlap: cfg.Strategy.BlockLondonNYOverlap == nil || *cfg.Strategy.BlockLondonNYOverlap,
-		TradingSessions:      cfg.Strategy.TradingSessions,
-		SpreadPoints:         0,
-		SlippagePoints:       0,
-		UseBreakEven:         cfg.Strategy.UseBreakEven,
-		BreakEvenR:           cfg.Strategy.BreakEvenR,
-		DailyDrawdownLimit:   cfg.Risk.DailyDrawdownLimit,
+		BlockLondonNYOverlap:          cfg.Strategy.BlockLondonNYOverlap == nil || *cfg.Strategy.BlockLondonNYOverlap,
+		TradingSessions:               cfg.Strategy.TradingSessions,
+		SpreadPoints:                  0,
+		SlippagePoints:                0,
+		UseBreakEven:                  cfg.Strategy.UseBreakEven,
+		BreakEvenR:                    cfg.Strategy.BreakEvenR,
+		DailyDrawdownLimit:            cfg.Risk.DailyDrawdownLimit,
 	}
 	if btCfg.ValuePerPoint <= 0 {
 		btCfg.ValuePerPoint = 1.0
@@ -436,10 +499,18 @@ func runBacktest(path string, cfg *config.Config, outDir string) {
 }
 
 func runBacktestDownload(backtestFrom, backtestTo, backtestEpic, backtestDir, backtestOutdir string, force bool) {
-	cfg := loadConfigForBacktest()
+	configPath := "config/config.json"
+	if p := os.Getenv("AURUMFLOW_CONFIG"); p != "" {
+		configPath = p
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		logger.Error("%v", err)
+		os.Exit(1)
+	}
 	ctx := context.Background()
 
-	client := market.NewClient(cfg.API.BaseURL)
+	client := market.NewDemoClient()
 	client.APIKey = cfg.API.APIKey
 	session, err := client.CreateSession(ctx, cfg.API.Identifier, cfg.API.Password)
 	if err != nil {

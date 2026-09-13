@@ -15,6 +15,12 @@ const (
 	RejectH4Range       = "H4_RANGE_BLOCKED"
 	RejectH4Filter      = "H4_FILTER"
 	RejectMaxTrades     = "MAX_TRADES"
+	RejectKillSwitch    = "KILL_SWITCH_ACTIVE"
+	RejectMinSizeRisk   = "MIN_SIZE_EXCEEDS_RISK_BUDGET"
+	RejectInstrumentSpec = "INSTRUMENT_SPEC_INCOMPLETE"
+	RejectExecDisabled  = "EXECUTION_DISABLED"
+	RejectDryRun        = "ORDER_DRY_RUN"
+	RejectMaxSize       = "MAX_SIZE_EXCEEDED"
 )
 
 // SetupEvaluated is written when the bot evaluates ComposerInput (every tick in session).
@@ -144,8 +150,44 @@ const (
 	EventOrderAttempt    = "order_attempt"
 	EventOrderResult     = "order_result"
 	EventPositionClosed  = "position_closed"
+	EventOrderIntent     = "order_intent"
+	EventOrderSkipped    = "order_skipped"
+	EventOrderDryRun     = "order_dry_run"
+	EventOrderSubmitted  = "order_submitted"
+	EventOrderConfirmed  = "order_confirmed"
+	EventOrderRejected   = "order_rejected"
+	EventPositionOpen    = "position_open"
+	EventPositionUpdateRequested = "position_update_requested"
+	EventPositionUpdated = "position_updated"
+	EventPositionCloseRequested = "position_close_requested"
+	EventPositionCloseRejected = "position_close_rejected"
 )
 
 func ts() string {
 	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// Lifecycle is a chronological trade/order event for reconstruction.
+type Lifecycle struct {
+	Ts            string  `json:"ts"`
+	Event         string  `json:"event"`
+	Epic          string  `json:"epic,omitempty"`
+	SignalID      string  `json:"signal_id,omitempty"`
+	State         string  `json:"state,omitempty"`
+	ExecutionMode string  `json:"execution_mode,omitempty"`
+	DealRef       string  `json:"deal_ref,omitempty"`
+	DealID        string  `json:"deal_id,omitempty"`
+	Direction     string  `json:"direction,omitempty"`
+	Size          float64 `json:"size,omitempty"`
+	ConfirmedSize float64 `json:"confirmed_size,omitempty"`
+	Entry         float64 `json:"entry,omitempty"`
+	SL            float64 `json:"sl,omitempty"`
+	TP            float64 `json:"tp,omitempty"`
+	FillPrice     float64 `json:"fill_price,omitempty"`
+	ClosePrice    float64 `json:"close_price,omitempty"`
+	CloseReason   string  `json:"close_reason,omitempty"`
+	Status        string  `json:"status,omitempty"`
+	Error         string  `json:"error,omitempty"`
+	Reason        string  `json:"reason,omitempty"`
+	Score         int     `json:"score,omitempty"`
 }

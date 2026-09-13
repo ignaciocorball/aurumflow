@@ -15,6 +15,7 @@ type JournalWriter interface {
 	WriteOrderAttempt(OrderAttempt) error
 	WriteOrderResult(OrderResult) error
 	WritePositionClosed(PositionClosed) error
+	WriteLifecycle(Lifecycle) error
 	Close() error
 }
 
@@ -110,6 +111,13 @@ func (w *FileWriter) WritePositionClosed(e PositionClosed) error {
 	}
 	if e.Event == "" {
 		e.Event = EventPositionClosed
+	}
+	return w.writeLine(e)
+}
+
+func (w *FileWriter) WriteLifecycle(e Lifecycle) error {
+	if e.Ts == "" {
+		e.Ts = ts()
 	}
 	return w.writeLine(e)
 }

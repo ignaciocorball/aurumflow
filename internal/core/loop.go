@@ -12,12 +12,14 @@ import (
 	"aurumflow/config"
 	"aurumflow/internal/execution"
 	"aurumflow/internal/journal"
+	"aurumflow/internal/killswitch"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
 	"aurumflow/internal/marketstate"
 	"aurumflow/internal/notifications"
 	"aurumflow/internal/risk"
 	"aurumflow/internal/strategy"
+	"aurumflow/internal/telemetry"
 	"aurumflow/pkg/models"
 )
 
@@ -41,7 +43,11 @@ type Loop struct {
 	PingEvery           time.Duration
 	lastPing            time.Time
 	ReloginFn           func() error
-	LiveConfirmRequired bool
+	LiveConfirmRequired bool // deprecated in P1; LIVE is fail-closed at startup
+	Provider            execution.ExecutionProvider
+	Kill                *killswitch.Switch
+	Spec                market.InstrumentSpec
+	AccountID           string
 	tickCount           int
 	lastStatusLog       time.Time
 	lastIdleLog         time.Time // when we last logged an idle line (OFF_HOURS or MARKET_CLOSED)
@@ -64,6 +70,11 @@ type Loop struct {
 	RunID      string
 	// lastHeartbeatBoundary: last aligned boundary when we emitted heartbeat (when heartbeat_interval_minutes + align_top are set)
 	lastHeartbeatBoundary time.Time
+	// Telemetry: optional live publisher (e.g. Firebase RTDB); set from main when telemetry.firebase enabled
+	Telemetry telemetry.LivePublisher
+	// BotTag: directory name of bot config (e.g. "eth-offensive-alpha"); empty if config is in config/ or root
+	BotTag           string
+	BotTagNormalized string
 }
 
 // NewLoop creates the event loop with wired dependencies.
@@ -77,6 +88,7 @@ func NewLoop(cfg *config.Config, client *market.Client, epic string, balance flo
 		Epic:      epic,
 		Risk:      rm,
 		Exec:      exec,
+		Provider:  exec,
 		State:     NewStateMachine(),
 		Interval:  60 * time.Second,
 		PingEvery: 5 * time.Minute,
@@ -87,6 +99,20 @@ func NewLoop(cfg *config.Config, client *market.Client, epic string, balance flo
 func (l *Loop) Run(ctx context.Context) {
 	logger.Info("event loop started: epic=%s interval=%v maxTrades=%d riskPerTrade=%.2f%%",
 		l.Epic, l.Interval, l.Config.Risk.MaxTrades, l.Config.Risk.RiskPerTrade)
+	if l.Telemetry != nil {
+		meta := telemetry.MetaPayload{
+			RunID: l.RunID, Epic: l.Epic,
+			StartedAt:     time.Now().UTC().Format(time.RFC3339),
+			SchemaVersion: 1, AnalyticsVersion: 1,
+		}
+		if l.BotTag != "" {
+			meta.BotTag = l.BotTag
+			meta.BotTagNormalized = l.BotTagNormalized
+		}
+		if err := l.Telemetry.PublishMeta(ctx, l.InstanceID, l.RunID, meta); err != nil {
+			logger.Warn("telemetry publish meta failed: %v", err)
+		}
+	}
 	ticker := time.NewTicker(l.Interval)
 	defer ticker.Stop()
 	// First tick immediately
@@ -132,7 +158,7 @@ func (l *Loop) tick(ctx context.Context) {
 				l.lastKnownMarketStatusAt = now
 			}
 		}
-		l.logStatusSummary(now)
+		l.logStatusSummary(ctx, now)
 		l.lastStatusLog = now
 	}
 
@@ -197,13 +223,14 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
-	// Refresh balance and open positions count
-	var balance float64
+	// Refresh balance of the selected account only (never accounts[0]).
 	if ar, err := l.Client.GetAccounts(ctx); err == nil {
-		for _, acc := range ar.Accounts {
-			balance = acc.Balance.Balance
-			l.Risk.UpdateBalance(balance)
-			break
+		acc, selErr := risk.SelectAccount(ar.Accounts, l.Config.API.AccountID, l.AccountID)
+		if selErr != nil {
+			logger.Warn("loop: account selection: %v", selErr)
+		} else {
+			l.Risk.UpdateBalance(acc.Balance.Balance)
+			l.AccountID = acc.AccountID
 		}
 	}
 	openCount := 0
@@ -256,21 +283,22 @@ func (l *Loop) tick(ctx context.Context) {
 					Type: notifications.TypePositionClosed, Category: notifications.CategoryExecution, Severity: notifications.SeverityCritical,
 					Instrument: l.Epic, Timestamp: closedAt,
 					Payload: map[string]any{
-						"exit_price":        0,
-						"exit_reason":       "UNKNOWN",
-						"pnl_pct":           0,
-						"pnl_r":             0,
-						"duration_minutes":  minutesInTrade,
-						"deal_ref":          l.lastOpenedDealRef,
-						"event_id":          uuid.New().String(),
-						"event_ts_utc":      closedAt.Format(time.RFC3339),
-						"instance_id":       l.InstanceID,
-						"run_id":            l.RunID,
+						"exit_price":       0,
+						"exit_reason":      "UNKNOWN",
+						"pnl_pct":          0,
+						"pnl_r":            0,
+						"duration_minutes": minutesInTrade,
+						"deal_ref":         l.lastOpenedDealRef,
+						"event_id":         uuid.New().String(),
+						"event_ts_utc":     closedAt.Format(time.RFC3339),
+						"instance_id":      l.InstanceID,
+						"run_id":           l.RunID,
 					},
 				})
 			}
 			l.State.ToCooldown()
 			logger.Success("all positions closed, state -> COOLDOWN")
+			telemetry.PublishPositionsBestEffort(l.Telemetry, ctx, l.InstanceID, l.Risk.GetOpenCount(), l.Config.Risk.MaxTrades, l.lastOpenedDealRef)
 		}
 		// Log position details if in trade
 		if openCount > 0 && l.State.State() == StateInTrade {
@@ -938,30 +966,29 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
-	if l.LiveConfirmRequired {
-		reasonCode := notifications.ReasonToCode(journal.RejectLiveConfirm)
-		l.lastDecision = "rejected:" + reasonCode
-		logger.Warn("skip order: live mode requires AURUMFLOW_LIVE_CONFIRM=1 to allow orders")
+	if l.Kill != nil && l.Kill.HaltNewOrders() {
+		l.lastDecision = "rejected:" + journal.RejectKillSwitch
+		logger.Warn("skip order: %s", journal.RejectKillSwitch)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectKillSwitch, Direction: signal.Direction, Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Score: signal.Score})
 		if l.Journal != nil {
 			_ = l.Journal.WriteSignalRejected(journal.SignalRejected{
-				Epic:         l.Epic,
-				State:        string(l.State.State()),
-				Session:      session,
-				RejectReason: journal.RejectLiveConfirm,
-				Direction:    signal.Direction,
-				Entry:        signal.Entry,
-				Score:        signal.Score,
-			})
-		}
-		if l.NotifEmitter != nil {
-			l.NotifEmitter.Emit(notifications.NotifEvent{
-				Type: notifications.TypeSignalRejected, Category: notifications.CategorySignals, Severity: notifications.SeverityInfo,
-				Instrument: l.Epic, Session: session, Timestamp: now,
-				Payload: map[string]any{"reason_code": reasonCode, "direction": signal.Direction, "score": signal.Score, "threshold": l.Config.Strategy.ScoreThreshold, "trend_h1": trendH1, "trend_h4": trendH4, "confidence": signal.Confidence},
+				Epic: l.Epic, State: string(l.State.State()), Session: session,
+				RejectReason: journal.RejectKillSwitch, Direction: signal.Direction, Entry: signal.Entry, Score: signal.Score,
 			})
 		}
 		return
 	}
+
+	execMode := l.Config.ExecMode()
+	if execMode == config.ExecutionDisabled {
+		l.lastDecision = "rejected:" + journal.RejectExecDisabled
+		l.journalLife(journal.Lifecycle{
+			Event: journal.EventOrderSkipped, Reason: journal.RejectExecDisabled,
+			Direction: signal.Direction, Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Score: signal.Score,
+		})
+		return
+	}
+
 	valid, err := l.Risk.ValidateSignal(signal)
 	if err != nil || !valid {
 		reasonCode := notifications.ReasonToCode(journal.RejectRiskReject)
@@ -1020,13 +1047,48 @@ func (l *Loop) tick(ctx context.Context) {
 		}
 	}
 
-	valuePerPoint := l.Config.Risk.ValuePerPoint
-	if valuePerPoint <= 0 {
-		valuePerPoint = 1.0
+	if !l.Spec.SizingComplete() {
+		if details, dErr := l.Client.GetMarketDetails(ctx, l.Epic); dErr == nil {
+			if spec, sErr := market.SpecFromDetails(details, l.Config.Risk.ValuePerPoint); sErr == nil {
+				l.Spec = spec
+			}
+		}
 	}
-	size, err := risk.PositionSize(l.Risk.Balance, l.Config.Risk.RiskPerTrade, stopDist, l.Exec.MinSize, l.Exec.SizeStep, valuePerPoint)
+	if !l.Spec.SizingComplete() {
+		l.lastDecision = "rejected:" + journal.RejectInstrumentSpec
+		logger.Warn("skip order: %s", journal.RejectInstrumentSpec)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectInstrumentSpec, Direction: signal.Direction, Score: signal.Score})
+		return
+	}
+	size, err := risk.ComputeSize(l.Risk.GetBalance(), l.Config.Risk.RiskPerTrade, stopDist, l.Spec)
 	if err != nil {
+		reason := journal.RejectRiskReject
+		errText := err.Error()
+		if strings.Contains(errText, risk.ReasonMinSizeExceedsRisk) {
+			reason = journal.RejectMinSizeRisk
+		} else if strings.Contains(errText, risk.ReasonInstrumentSpec) {
+			reason = journal.RejectInstrumentSpec
+		} else if strings.Contains(errText, risk.ReasonMaxSizeExceeded) {
+			reason = journal.RejectMaxSize
+		}
+		l.lastDecision = "rejected:" + reason
 		logger.Warn("loop: position size: %v", err)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: reason, Error: errText, Direction: signal.Direction, Score: signal.Score})
+		return
+	}
+
+	l.journalLife(journal.Lifecycle{
+		Event: journal.EventOrderIntent, Direction: signal.Direction, Size: size,
+		Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Score: signal.Score,
+	})
+	if execMode == config.ExecutionDryRun {
+		l.lastDecision = "dry_run"
+		logger.Info("DRY_RUN would_have_sent epic=%s direction=%s size=%.4f entry=%.2f sl=%.2f tp=%.2f score=%d state=%s",
+			l.Epic, signal.Direction, size, signal.Entry, signal.StopLoss, signal.TakeProfit, signal.Score, l.State.State())
+		l.journalLife(journal.Lifecycle{
+			Event: journal.EventOrderDryRun, Reason: "would_have_sent",
+			Direction: signal.Direction, Size: size, Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Score: signal.Score,
+		})
 		return
 	}
 
@@ -1040,7 +1102,7 @@ func (l *Loop) tick(ctx context.Context) {
 			TP:                  signal.TakeProfit,
 			MaxSpread:           l.Config.API.MaxSpread,
 			Spread:              spread,
-			LiveConfirmRequired: l.LiveConfirmRequired,
+			LiveConfirmRequired: false,
 		})
 	}
 	if l.NotifEmitter != nil {
@@ -1051,7 +1113,25 @@ func (l *Loop) tick(ctx context.Context) {
 		})
 	}
 
-	dealRef, err := l.Exec.SendOrder(ctx, signal, size)
+	if l.Kill != nil && l.Kill.HaltNewOrders() {
+		l.lastDecision = "rejected:" + journal.RejectKillSwitch
+		logger.Warn("skip order immediately before broker mutation: %s", journal.RejectKillSwitch)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: journal.RejectKillSwitch, Direction: signal.Direction, Size: size})
+		return
+	}
+
+	prov := l.Provider
+	if prov == nil {
+		prov = l.Exec
+	}
+	openRes, err := prov.OpenPosition(ctx, execution.OpenRequest{
+		Epic: l.Epic, Direction: signal.Direction, Size: size,
+		StopLoss: signal.StopLoss, TakeProfit: signal.TakeProfit, Signal: signal,
+	})
+	dealRef := ""
+	if openRes != nil {
+		dealRef = openRes.DealReference
+	}
 	if err != nil {
 		if strings.Contains(err.Error(), "401") && l.ReloginFn != nil {
 			_ = l.ReloginFn()
@@ -1082,6 +1162,10 @@ func (l *Loop) tick(ctx context.Context) {
 			DealRef: dealRef,
 		})
 	}
+	l.journalLife(journal.Lifecycle{
+		Event: journal.EventOrderSubmitted, DealRef: dealRef, Direction: signal.Direction,
+		Size: size, Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Status: "SUBMITTED",
+	})
 	l.State.ToInTrade()
 	l.lastOpenedDealRef = dealRef
 	l.lastOpenedSignal = signal
@@ -1110,21 +1194,36 @@ func (l *Loop) tick(ctx context.Context) {
 			Type: notifications.TypePositionOpened, Category: notifications.CategoryExecution, Severity: notifications.SeverityCritical,
 			Instrument: l.Epic, Session: session, Timestamp: now,
 			Payload: map[string]any{
-				"direction":       signal.Direction,
-				"fill_price":      signal.Entry,
-				"sl":              signal.StopLoss,
-				"tp":              signal.TakeProfit,
-				"open_positions":  currentOpenCount,
-				"deal_ref":        dealRef,
-				"event_id":        uuid.New().String(),
-				"event_ts_utc":    now.Format(time.RFC3339),
-				"instance_id":     l.InstanceID,
-				"run_id":          l.RunID,
+				"direction":      signal.Direction,
+				"fill_price":     signal.Entry,
+				"sl":             signal.StopLoss,
+				"tp":             signal.TakeProfit,
+				"open_positions": currentOpenCount,
+				"deal_ref":       dealRef,
+				"event_id":       uuid.New().String(),
+				"event_ts_utc":   now.Format(time.RFC3339),
+				"instance_id":    l.InstanceID,
+				"run_id":         l.RunID,
 			},
 		})
 	}
+	telemetry.PublishPositionsBestEffort(l.Telemetry, ctx, l.InstanceID, currentOpenCount, l.Config.Risk.MaxTrades, dealRef)
 
 	confirm, err := l.Exec.ConfirmDeal(ctx, dealRef)
+	if err == nil && confirm != nil {
+		l.journalLife(journal.Lifecycle{
+			Event: journal.EventOrderConfirmed, DealRef: confirm.DealReference, DealID: confirm.DealID,
+			Direction: confirm.Direction, Size: size, ConfirmedSize: confirm.Size, FillPrice: confirm.Level,
+			Status: confirm.Status, Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit,
+		})
+		l.journalLife(journal.Lifecycle{
+			Event: journal.EventPositionOpen, DealRef: confirm.DealReference, DealID: confirm.DealID,
+			Direction: confirm.Direction, Size: confirm.Size, FillPrice: confirm.Level, Status: confirm.Status,
+		})
+		if confirm.DealID != "" {
+			l.lastOpenedDealRef = confirm.DealID
+		}
+	}
 	if err != nil {
 		logger.Warn("loop: confirm deal: %v", err)
 	} else if l.Journal != nil && confirm != nil {
@@ -1250,18 +1349,18 @@ func nextHeartbeatBoundary(now time.Time, intervalMin int, alignTop bool) time.T
 }
 
 // logStatusSummary logs a periodic status summary and emits HEARTBEAT (with marketStatus + lastDecision) and optionally DAILY_DD_UPDATE.
-func (l *Loop) logStatusSummary(now time.Time) {
+func (l *Loop) logStatusSummary(ctx context.Context, now time.Time) {
 	state := l.State.State()
 	balance := l.Risk.GetBalance()
 	openCount := l.Risk.GetOpenCount()
 	ddPct := l.Risk.DailyDrawdownPct()
 	logger.Info("status summary: state=%s balance=%.2f openPositions=%d/%d dailyDD=%.2f%% (account-level) tick=%d",
 		state, balance, openCount, l.Config.Risk.MaxTrades, ddPct, l.tickCount)
+	marketStatus := l.lastKnownMarketStatus
+	if marketStatus == "" {
+		marketStatus = "UNKNOWN"
+	}
 	if l.NotifEmitter != nil {
-		marketStatus := l.lastKnownMarketStatus
-		if marketStatus == "" {
-			marketStatus = "UNKNOWN"
-		}
 		l.NotifEmitter.Emit(notifications.NotifEvent{
 			Type: notifications.TypeHeartbeat, Category: notifications.CategoryHealth, Severity: notifications.SeverityInfo,
 			Instrument: l.Epic, Timestamp: now,
@@ -1298,6 +1397,20 @@ func (l *Loop) logStatusSummary(now time.Time) {
 				Payload: map[string]any{"open_positions": openCount, "max_trades": l.Config.Risk.MaxTrades},
 			})
 		}
+	}
+	if l.Telemetry != nil {
+		telemetry.PublishStatusBestEffort(l.Telemetry, ctx, l.InstanceID, l.RunID, telemetry.StatusSnapshot{
+			State:            string(state),
+			Balance:          balance,
+			OpenPositions:    openCount,
+			LastDecision:     l.lastDecision,
+			MarketStatus:     marketStatus,
+			DailyDrawdownPct: ddPct,
+			Tick:             l.tickCount,
+			UpdatedAt:        now.Format(time.RFC3339),
+			RunID:            l.RunID,
+			SchemaVersion:    1,
+		})
 	}
 }
 

@@ -117,6 +117,12 @@ var reasonToCode = map[string]string{
 	"DATA_FROZEN":         RejDataFrozen,
 	"RISK_DD_LIMIT":       RejRiskDDLimit,
 	"ENTRY_DELAY_ACTIVE":  RejEntryDelayActive,
+	"KILL_SWITCH_ACTIVE":  RejRiskReject,
+	"MIN_SIZE_EXCEEDS_RISK_BUDGET": RejRiskReject,
+	"INSTRUMENT_SPEC_INCOMPLETE": RejRiskReject,
+	"EXECUTION_DISABLED": RejLiveConfirm,
+	"ORDER_DRY_RUN":      RejLiveConfirm,
+	"MAX_SIZE_EXCEEDED":  RejRiskReject,
 }
 
 // ReasonToCode maps raw reject reason to standard code. Unknown -> "REJ_UNKNOWN:<normalized>".
