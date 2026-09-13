@@ -63,6 +63,15 @@ func (s *Switch) Halt() {
 	s.mu.Unlock()
 }
 
+// HaltPersist turns HALT_NEW_ORDERS on and writes the sentinel file.
+func (s *Switch) HaltPersist() error {
+	if s == nil {
+		return os.WriteFile(DefaultFile, []byte("HALT_NEW_ORDERS\n"), 0644)
+	}
+	s.Halt()
+	return os.WriteFile(s.FilePath(), []byte("HALT_NEW_ORDERS\n"), 0644)
+}
+
 func (s *Switch) Resume() {
 	if s == nil {
 		return

@@ -39,6 +39,7 @@ logs/
 !/docs/audit/
 !/docs/audit/**
 /logs
+/journals
 AurumFlow.md
 
 # Firebase / secrets (never commit)

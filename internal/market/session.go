@@ -23,8 +23,13 @@ type SessionResponse struct {
 
 // AccountInfo holds balance and account id.
 type AccountInfo struct {
-	AccountID string  `json:"accountId"`
-	Balance   Balance `json:"balance"`
+	AccountID   string  `json:"accountId"`
+	AccountName string  `json:"accountName,omitempty"`
+	AccountType string  `json:"accountType,omitempty"`
+	Currency    string  `json:"currency,omitempty"`
+	Preferred   bool    `json:"preferred,omitempty"`
+	Status      string  `json:"status,omitempty"`
+	Balance     Balance `json:"balance"`
 }
 
 // Balance holds balance fields.

@@ -8,6 +8,8 @@ type InstrumentSpec struct {
 	Epic           string
 	InstrumentType string
 	Name           string
+	Currency       string
+	MarketStatus   string
 	MinDealSize    float64
 	MaxDealSize    float64
 	SizeStep       float64
@@ -29,6 +31,8 @@ func SpecFromDetails(details *MarketDetailsResponse, valuePerPoint float64) (Ins
 		Epic:           details.Instrument.Epic,
 		InstrumentType: details.Instrument.Type,
 		Name:           details.Instrument.Name,
+		Currency:       details.Instrument.Currency,
+		MarketStatus:   details.Snapshot.MarketStatus,
 		MinDealSize:    details.DealingRules.MinDealSize.Value,
 		MaxDealSize:    details.DealingRules.MaxDealSize.Value,
 		SizeStep:       details.DealingRules.MinSizeIncrement.Value,

@@ -32,6 +32,8 @@ type ConfirmResult struct {
 	Size          float64
 	Direction     string
 	Epic          string
+	Reason        string
+	ProfitLoss    float64
 }
 
 // CloseResult is a close or update acknowledgement plus optional confirm.
@@ -40,6 +42,7 @@ type CloseResult struct {
 	DealID        string
 	Status        string
 	Level         float64
+	PnL           float64
 }
 
 // UpdateRequest updates SL/TP on an open position.

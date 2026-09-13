@@ -116,6 +116,34 @@ func TestMaxOpenTrades(t *testing.T) {
 	}
 }
 
+func TestSelectDemoAccount_UniqueAndPreferred(t *testing.T) {
+	one := []market.AccountInfo{{AccountID: "A", AccountType: "CFD", Balance: market.Balance{Balance: 1}}}
+	got, err := SelectDemoAccount(one, "")
+	if err != nil || got.AccountID != "A" {
+		t.Fatalf("single: %v %#v", err, got)
+	}
+	many := []market.AccountInfo{
+		{AccountID: "A", AccountType: "SPREADBET", Preferred: false},
+		{AccountID: "B", AccountType: "CFD", Preferred: true, Balance: market.Balance{Balance: 9}},
+		{AccountID: "C", AccountType: "CFD", Preferred: false},
+	}
+	got, err = SelectDemoAccount(many, "A")
+	if err != nil || got.AccountID != "B" {
+		t.Fatalf("preferred cfd: %v %#v", err, got)
+	}
+	ambiguous := []market.AccountInfo{
+		{AccountID: "A", AccountType: "CFD", Preferred: false},
+		{AccountID: "B", AccountType: "CFD", Preferred: false},
+	}
+	got, err = SelectDemoAccount(ambiguous, "B")
+	if err != nil || got.AccountID != "B" {
+		t.Fatalf("session current: %v %#v", err, got)
+	}
+	if _, err := SelectDemoAccount(ambiguous, ""); err == nil {
+		t.Fatal("ambiguous without current must refuse")
+	}
+}
+
 func TestSelectAccount_NoFallback(t *testing.T) {
 	accs := []market.AccountInfo{{AccountID: "A", Balance: market.Balance{Balance: 1}}, {AccountID: "B", Balance: market.Balance{Balance: 2}}}
 	if _, err := SelectAccount(accs, "", ""); err == nil {

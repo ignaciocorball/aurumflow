@@ -24,7 +24,9 @@ type PositionData struct {
 	Size     float64 `json:"size"`
 	Direction string `json:"direction"`
 	Level   float64 `json:"level"`
-	Epic    string  `json:"epic,omitempty"`
+	Epic       string  `json:"epic,omitempty"`
+	ProfitLoss float64 `json:"profitLoss,omitempty"`
+	Upnl       float64 `json:"upl,omitempty"`
 }
 
 // GetEpic returns the epic for this position (from Market.Epic or Position.Epic).
@@ -124,6 +126,8 @@ type ConfirmDealResponse struct {
 	Size          float64 `json:"size"`
 	Direction     string  `json:"direction"`
 	Epic          string  `json:"epic"`
+	Reason        string  `json:"reason,omitempty"`
+	ProfitLoss    float64 `json:"profitLoss,omitempty"`
 }
 
 // GetPositions returns all open positions for the active account.

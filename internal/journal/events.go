@@ -19,6 +19,7 @@ const (
 	RejectMinSizeRisk   = "MIN_SIZE_EXCEEDS_RISK_BUDGET"
 	RejectInstrumentSpec = "INSTRUMENT_SPEC_INCOMPLETE"
 	RejectExecDisabled  = "EXECUTION_DISABLED"
+	RejectUnknownPos    = "UNKNOWN_POSITIONS"
 	RejectDryRun        = "ORDER_DRY_RUN"
 	RejectMaxSize       = "MAX_SIZE_EXCEEDED"
 )
@@ -175,6 +176,7 @@ type Lifecycle struct {
 	SignalID      string  `json:"signal_id,omitempty"`
 	State         string  `json:"state,omitempty"`
 	ExecutionMode string  `json:"execution_mode,omitempty"`
+	Environment   string  `json:"environment,omitempty"`
 	DealRef       string  `json:"deal_ref,omitempty"`
 	DealID        string  `json:"deal_id,omitempty"`
 	Direction     string  `json:"direction,omitempty"`

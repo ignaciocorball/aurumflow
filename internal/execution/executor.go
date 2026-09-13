@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,6 +67,8 @@ type ConfirmResponse struct {
 	Size          float64  `json:"size"`
 	Direction     string   `json:"direction"`
 	Epic          string   `json:"epic"`
+	Reason        string   `json:"reason,omitempty"`
+	ProfitLoss    float64  `json:"profitLoss,omitempty"`
 }
 
 func (e *Executor) Mode() config.ExecutionMode { return config.ExecutionDemo }
@@ -78,6 +81,29 @@ func (e *Executor) throttle() {
 	}
 	e.rateLimit = time.Now().Add(100 * time.Millisecond)
 	e.mu.Unlock()
+}
+
+// OpenInfrastructure submits a single DEMO canary order with no strategy SL/TP.
+func (e *Executor) OpenInfrastructure(ctx context.Context, direction string, size float64) (*OpenResult, error) {
+	e.throttle()
+	req := CreatePositionRequest{
+		Epic:           e.Epic,
+		Direction:      direction,
+		Size:           size,
+		GuaranteedStop: false,
+	}
+	data, err := e.Client.Do(ctx, "POST", "/api/v1/positions", req, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp CreatePositionResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parse position response: %w", err)
+	}
+	if strings.TrimSpace(resp.DealReference) == "" {
+		return nil, fmt.Errorf("open infrastructure: empty dealReference")
+	}
+	return &OpenResult{DealReference: resp.DealReference}, nil
 }
 
 func (e *Executor) OpenPosition(ctx context.Context, req OpenRequest) (*OpenResult, error) {
@@ -106,6 +132,8 @@ func (e *Executor) Confirm(ctx context.Context, dealReference string) (*ConfirmR
 		Size:          cr.Size,
 		Direction:     cr.Direction,
 		Epic:          cr.Epic,
+		Reason:        cr.Reason,
+		ProfitLoss:    cr.ProfitLoss,
 	}, nil
 }
 
@@ -120,6 +148,7 @@ func (e *Executor) ClosePosition(ctx context.Context, dealID string) (*CloseResu
 		if cr, cerr := e.ConfirmDeal(ctx, ack.DealReference); cerr == nil && cr != nil {
 			out.Status = cr.Status
 			out.Level = cr.Level
+			out.PnL = cr.ProfitLoss
 			if cr.DealID != "" {
 				out.DealID = cr.DealID
 			}
@@ -228,6 +257,8 @@ func (e *Executor) ConfirmDeal(ctx context.Context, dealReference string) (*Conf
 		Size:          md.Size,
 		Direction:     md.Direction,
 		Epic:          md.Epic,
+		Reason:        md.Reason,
+		ProfitLoss:    md.ProfitLoss,
 	}
 	logger.Info("execution: confirm dealRef=%s status=%s dealStatus=%s dealId=%s",
 		cr.DealReference, cr.Status, cr.DealStatus, cr.DealID)

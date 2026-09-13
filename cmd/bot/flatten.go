@@ -51,9 +51,10 @@ func runFlatten(ctx context.Context, cfg *config.Config, epic string, confirmed 
 		logger.Error("flatten list: %v", err)
 		os.Exit(1)
 	}
+	logger.Info("flatten: broker open positions=%d", len(positions))
 	n := 0
 	for _, p := range positions {
-		if epic != "" && p.Epic != "" && p.Epic != epic {
+		if epic != "" && p.Epic != "" && !strings.EqualFold(p.Epic, epic) {
 			continue
 		}
 		logger.Info("flatten: closing dealId=%s epic=%s", p.DealID, p.Epic)

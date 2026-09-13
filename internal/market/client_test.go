@@ -352,6 +352,20 @@ func TestConfirmDeal(t *testing.T) {
 	}
 }
 
+func TestPickTradeableCanary(t *testing.T) {
+	_, err := PickTradeableCanary(nil)
+	if err == nil {
+		t.Fatal("empty")
+	}
+	got, err := PickTradeableCanary([]MarketInfo{
+		{Epic: "GOLD", MarketStatus: "CLOSED", InstrumentType: "COMMODITIES"},
+		{Epic: "BTCUSD", MarketStatus: "TRADEABLE", InstrumentType: "CRYPTOCURRENCIES"},
+	})
+	if err != nil || got.Epic != "BTCUSD" {
+		t.Fatalf("%v %#v", err, got)
+	}
+}
+
 func TestClosePosition_EmptyDealID(t *testing.T) {
 	c := NewClient("http://127.0.0.1")
 	if _, err := c.ClosePosition(context.Background(), ""); err == nil {
