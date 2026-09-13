@@ -23,7 +23,9 @@ func SaveSpec(path string, s MonetaryInstrumentSpec) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	s.EvidenceVersion = EvidenceVersion
+	if s.EvidenceVersion == "" {
+		s.EvidenceVersion = EvidenceVersion
+	}
 	if s.ValidatedAt.IsZero() {
 		s.ValidatedAt = time.Now().UTC()
 	}

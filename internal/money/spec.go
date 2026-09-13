@@ -28,11 +28,15 @@ type MonetaryInstrumentSpec struct {
 	MinDealSize        float64
 	MaxDealSize        float64
 	SizeIncrement      float64
-	MoneyPerPriceUnit  float64 // PnL currency per 1.0 price unit per 1.0 size; 0 = unknown
-	ValidationStatus   string
-	ValidatedAt        time.Time
-	ValidationEvidence string
-	EvidenceVersion    string
+	MoneyPerPriceUnit         float64 // PnL currency per 1.0 price unit per 1.0 size; 0 = unknown
+	MoneyPerPriceUnitCurrency string
+	ValidationStatus          string
+	ValidatedAt               time.Time
+	ValidationEvidence        string
+	EvidenceVersion           string
+	CalibrationSource         string
+	CalibrationSamples        int
+	CalibrationDealID         string
 }
 
 func FromMarketDetails(details *market.MarketDetailsResponse) MonetaryInstrumentSpec {

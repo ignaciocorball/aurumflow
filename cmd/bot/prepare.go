@@ -39,6 +39,11 @@ func runPrepareInstrument(ctx context.Context, epic string, calibrate bool) {
 			spec.ValidationEvidence = prev.ValidationEvidence
 			spec.ValidatedAt = prev.ValidatedAt
 			spec.MoneyPerPriceUnit = prev.MoneyPerPriceUnit
+			spec.MoneyPerPriceUnitCurrency = prev.MoneyPerPriceUnitCurrency
+			spec.CalibrationSource = prev.CalibrationSource
+			spec.CalibrationSamples = prev.CalibrationSamples
+			spec.CalibrationDealID = prev.CalibrationDealID
+			spec.EvidenceVersion = prev.EvidenceVersion
 			logger.Info("CACHE: reused RUNTIME_VALIDATED spec for %s", epic)
 		}
 	}
@@ -51,30 +56,48 @@ func runPrepareInstrument(ctx context.Context, epic string, calibrate bool) {
 		logger.Error("PREPARE: dealing rules incomplete")
 		os.Exit(1)
 	}
-	if calibrate || spec.ValidationStatus != money.RuntimeValidated {
-		if !demoEnvConfigured() {
-			logger.Error("calibration requires DEMO credentials")
+	if !calibrate {
+		_ = money.SaveSpec(cachePath, spec)
+		logger.Info("PREPARE DONE epic=%s validation=%s cache=%s (no broker mutation)", spec.Epic, spec.ValidationStatus, cachePath)
+		return
+	}
+	if spec.ValidationStatus == money.RuntimeValidated && spec.MoneyPerPriceUnit > 0 {
+		_ = money.SaveSpec(cachePath, spec)
+		logger.Info("CALIB skipped: %s already RUNTIME_VALIDATED mpu=%.6f", epic, spec.MoneyPerPriceUnit)
+		return
+	}
+	if !demoEnvConfigured() {
+		logger.Error("calibration requires DEMO credentials")
+		os.Exit(1)
+	}
+	if calibMethod != "" && calibMethod != "upl-slope" {
+		logger.Error("unknown --calibration-method %s (only upl-slope)", calibMethod)
+		os.Exit(1)
+	}
+	logger.Info("CALIB method=upl-slope epic=%s max=%ds", epic, calibSeconds)
+	spec, res := runUPLSlopeCalibration(ctx, epic, spec)
+	if fresh, err := sess.client.GetPositions(ctx); err == nil {
+		left := 0
+		for _, p := range fresh.Positions {
+			if strings.EqualFold(p.GetEpic(), epic) {
+				left++
+			}
+		}
+		if left != 0 {
+			logger.Error("PREPARE HALT: %s still has %d open positions", epic, left)
 			os.Exit(1)
 		}
-		logger.Info("PREPARE: running controlled min-size calibration canary for %s", epic)
-		runLifecycleCanary(ctx, epic)
-		if fresh, err := sess.client.GetPositions(ctx); err == nil {
-			left := 0
-			for _, p := range fresh.Positions {
-				if strings.EqualFold(p.GetEpic(), epic) {
-					left++
-				}
-			}
-			if left != 0 {
-				logger.Error("PREPARE HALT: %s still has %d open positions", epic, left)
-				os.Exit(1)
-			}
-		}
-		// Single-trade close PnL is insufficient. Keep metadata inference unless UPL samples exist.
-		if spec.MoneyPerPriceUnit > 0 {
-			spec.ValidationEvidence = "broker metadata inferred; calibration canary closed to zero; UPL multi-sample still required for RUNTIME_VALIDATED"
+		if !demoWeekEligible(spec, left) && res.OK {
+			logger.Error("CALIB inconsistent: runtime ok but eligibility failed")
+			os.Exit(1)
 		}
 	}
 	_ = money.SaveSpec(cachePath, spec)
-	logger.Info("PREPARE DONE epic=%s validation=%s cache=%s", spec.Epic, spec.ValidationStatus, cachePath)
+	if spec.ValidationStatus != money.RuntimeValidated {
+		logger.Error("CALIB not validated status=%s reason=%s", spec.ValidationStatus, res.Failure)
+		os.Exit(1)
+	}
+	logger.Info("CALIB DONE epic=%s validation=%s mpu=%.6f ccy=%s samples=%d deal=%s cache=%s",
+		spec.Epic, spec.ValidationStatus, spec.MoneyPerPriceUnit, spec.MoneyPerPriceUnitCurrency,
+		res.Samples, res.EvidenceDealID, cachePath)
 }

@@ -42,9 +42,10 @@ function Get-Preflight {
     $raw = Get-BotText @("--ops-preflight")
     Write-Host $raw
     if ($script:LastBotExit -ne 0) { Fail "ops-preflight exit $script:LastBotExit" }
-    $jsonStart = $raw.IndexOf("{")
+    $clean = (($raw -split "`n") | Where-Object { $_ -notmatch '^\d{4}/\d{2}/\d{2}' }) -join "`n"
+    $jsonStart = $clean.IndexOf("{")
     if ($jsonStart -lt 0) { Fail "ops-preflight produced no JSON" }
-    $json = $raw.Substring($jsonStart)
+    $json = $clean.Substring($jsonStart)
     $end = $json.LastIndexOf("}")
     $obj = $json.Substring(0, $end + 1) | ConvertFrom-Json
     return $obj
@@ -111,9 +112,9 @@ $pos = Require-Check $pf "positions" @("PASS")
 if ($pos.detail -ne "0") { Fail "positions != 0 at GO" }
 
 Write-Host "=== 11 start demo-week :8765 (SHADOW on 8766 is left running) ==="
-$demoArgs = @(
-    "/c", "go run ./cmd/bot --demo-week --epic GOLD --status-addr 127.0.0.1:8765"
-)
-Start-Process -FilePath "cmd.exe" -ArgumentList $demoArgs -WorkingDirectory (Get-Location)
+$env:AURUMFLOW_CONFIG = "config/demo_config.json"
+Start-Process -FilePath "go" -ArgumentList @(
+    "run", "./cmd/bot", "--demo-week", "--epic", "GOLD", "--status-addr", "127.0.0.1:8765"
+) -WorkingDirectory (Get-Location) -WindowStyle Minimized
 Write-Host "DEMO-WEEK launched on 127.0.0.1:8765 - Legacy only. Radar/Exhaustion/Absorption remain SHADOW."
 exit 0

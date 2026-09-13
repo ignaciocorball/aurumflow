@@ -45,7 +45,9 @@ func main() {
 	canaryLife := flag.Bool("canary-lifecycle", false, "DEMO infrastructure OPEN/CONFIRM/READ/CLOSE (requires AURUMFLOW_DEMO_*; never the strategy loop)")
 	epicFlag := flag.String("epic", "", "instrument epic for canary/prepare (empty = discover TRADEABLE Bitcoin then Ethereum)")
 	prepareInst := flag.String("prepare-instrument", "", "DEMO prepare/validate an epic (GOLD recommended); never LIVE")
-	calibrateInst := flag.String("calibrate-instrument", "", "DEMO min-size calibration canary for an epic if TRADEABLE")
+	calibrateInst := flag.String("calibrate-instrument", "", "DEMO min-size UPL-slope calibration for an epic if TRADEABLE")
+	calibrationMethod := flag.String("calibration-method", "upl-slope", "monetary calibration method (upl-slope)")
+	calibrationSeconds := flag.Int("calibration-seconds", 150, "max seconds to sample UPL while the canary is open")
 	demoWeek := flag.Bool("demo-week", false, "one-week DEMO runner with startup gates; refuses LIVE")
 	shadowSoak := flag.Bool("shadow-soak", false, "public BTCUSDT SHADOW soak (no broker mutations)")
 	soakMin := flag.Int("soak-minutes", 1, "shadow soak duration in minutes")
@@ -108,6 +110,8 @@ func main() {
 		return
 	}
 	if *calibrateInst != "" {
+		calibMethod = *calibrationMethod
+		calibSeconds = *calibrationSeconds
 		runPrepareInstrument(context.Background(), *calibrateInst, true)
 		return
 	}
