@@ -147,7 +147,9 @@ func collectCapitalFrame(ctx context.Context, maps []instrument.Mapping, now tim
 		event := now
 		q := livesurface.NewQuote(m.Canonical, m.Epic, d.Snapshot.Bid, d.Snapshot.Offer, d.Snapshot.MarketStatus, event, recv, 2*time.Minute)
 		quotes[m.Canonical] = q
-		if cs, err := sess.client.GetPrices(ctx, m.Epic, "MINUTE_5", 80, time.Time{}, time.Time{}); err == nil {
+		if h := historyOf(m.Canonical); len(h.M5Bars) > 0 {
+			hist[m.Canonical] = h.M5Bars
+		} else if cs, err := sess.client.GetPrices(ctx, m.Epic, "MINUTE_5", 80, time.Time{}, time.Time{}); err == nil {
 			var candles []livesurface.Candle
 			for _, c := range cs {
 				candles = append(candles, livesurface.Candle{Time: c.Time, Close: c.Close, High: c.High, Low: c.Low})

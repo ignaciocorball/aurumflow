@@ -78,6 +78,10 @@ func ApplyLiveFrame(ws WorldState, frame livesurface.Frame) WorldState {
 		ac.Momentum = frame.Breadth.State
 		ws.AssetClasses[worlddomain.AssetEquities] = ac
 	}
+	ws.LiveAt = frame.AsOf
+	if ws.LiveAt.IsZero() {
+		ws.LiveAt = ws.AsOf
+	}
 	return Finalize(ws)
 }
 

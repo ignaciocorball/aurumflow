@@ -20,6 +20,19 @@ func TestQueueDoesNotCalibrate(t *testing.T) {
 	}
 }
 
+func TestCalStateAndRecommend(t *testing.T) {
+	if CalState(Row{}) != CalUnresolved {
+		t.Fatal("unresolved")
+	}
+	if CalState(Row{Market: "SILVER", Epic: "SILVER", Discovered: true, SpecValid: true, MoneyConfidence: "UNKNOWN", MonetaryMeta: "UNKNOWN", Tradeable: true}) != CalRiskUnknown {
+		t.Fatal("risk")
+	}
+	next, reason := RecommendAfterGold([]Row{{Market: "SILVER", Epic: "SILVER", Discovered: true, Tradeable: false, Legacy: "LEGACY_NEEDS_CONFIG"}})
+	if next != "SILVER" || reason == "" {
+		t.Fatal(next, reason)
+	}
+}
+
 func TestUniverseUnresolvedUS500(t *testing.T) {
 	rows := UniverseRows([]instrument.Mapping{{Canonical: "GOLD", Epic: "GOLD"}, {Canonical: "US500", Unresolved: true}})
 	var us Row

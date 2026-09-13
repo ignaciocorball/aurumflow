@@ -55,6 +55,12 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	if !strings.Contains(html, "WORLD MARKET TAPE") || !strings.Contains(html, "PRICE LEADERSHIP") || !strings.Contains(html, "CAPITAL FLOW EVIDENCE") {
 		t.Fatal("live tape panels")
 	}
+	if !strings.Contains(html, "SESSION STRIP") || !strings.Contains(html, "TOKYO") || !strings.Contains(html, "CORRELATION ≠ CAUSATION") {
+		t.Fatal("p82 ui")
+	}
+	if !strings.Contains(html, "$300 DEMO") || !strings.Contains(html, "account_currency_risk") {
+		t.Fatal("risk units")
+	}
 	for _, bad := range []string{"BUY", "SELL", "CLOSE", "FLATTEN", "CST", "X-SECURITY-TOKEN", "password", "api_key"} {
 		if strings.Contains(html, bad) && bad != "CLOSE" {
 			t.Fatalf("must not expose %s", bad)

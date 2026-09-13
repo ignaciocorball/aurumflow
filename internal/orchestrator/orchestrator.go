@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -32,6 +33,10 @@ type DecisionProposal struct {
 	Setup               worlddomain.SetupState
 	Eligibility         worlddomain.ExecEligibility
 	Decision            string
+	WhyAttention        string
+	WhySetup            string
+	WhyBlocked          string
+	MissingData         string
 }
 
 type Extra struct {
@@ -115,6 +120,25 @@ func (d *DecisionOrchestrator) ProposeWith(ws worldstate.WorldState, r opportuni
 	}
 	p.Blocking = UniqueSorted(p.Blocking)
 	p.PortfolioBlocks = UniqueSorted(p.PortfolioBlocks)
+	p.WhyAttention = fmt.Sprintf("ATTENTION_SCORE_V1 frozen components; score=%.1f coverage=%.1f", r.Score, r.Coverage)
+	switch p.Setup {
+	case worlddomain.SetupPotential:
+		p.WhySetup = "Legacy evaluated and produced a setup: " + legacy
+	case worlddomain.SetupNoSetup:
+		p.WhySetup = "Legacy had required inputs and found no setup"
+	default:
+		p.WhySetup = "INSUFFICIENT_DATA — Legacy did not evaluate"
+	}
+	if len(p.Blocking) > 0 || len(p.PortfolioBlocks) > 0 {
+		p.WhyBlocked = strings.Join(append(append([]string{}, p.Blocking...), p.PortfolioBlocks...), "; ")
+	} else {
+		p.WhyBlocked = "none"
+	}
+	if extra.HistoryKnown && extra.HistoryPresent {
+		p.MissingData = "none for Legacy inputs"
+	} else {
+		p.MissingData = "history warmup and/or live features incomplete"
+	}
 	return p
 }
 

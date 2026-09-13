@@ -32,6 +32,15 @@ type Signal struct {
 	GitCommit             string          `json:"git_commit"`
 	Tier                  string          `json:"tier,omitempty"`
 	Eligibility           string          `json:"eligibility,omitempty"`
+	Session               string          `json:"session,omitempty"`
+	MarketStatus          string          `json:"market_status,omitempty"`
+	HistoryReady          string          `json:"history_readiness,omitempty"`
+	Attention             float64         `json:"attention,omitempty"`
+	Coverage              float64         `json:"coverage,omitempty"`
+	Legacy                string          `json:"legacy,omitempty"`
+	Micro                 string          `json:"micro_capability,omitempty"`
+	ProposalLabel         string          `json:"proposal_label,omitempty"`
+	DataQuality           string          `json:"data_quality,omitempty"`
 }
 
 func Path(dir string) string {
@@ -90,7 +99,20 @@ func ShouldRecord(prev *Signal, next Signal) bool {
 	if prev.Tier != next.Tier || prev.Eligibility != next.Eligibility {
 		return true
 	}
+	if prev.ProposalLabel != next.ProposalLabel || prev.Legacy != next.Legacy || prev.DataQuality != next.DataQuality {
+		return true
+	}
+	if abs(next.Attention-prev.Attention) >= 5 {
+		return true
+	}
 	return next.T0.Sub(prev.T0) >= DedupWindow
+}
+
+func abs(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func Record(dir string, s Signal) error {

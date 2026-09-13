@@ -102,6 +102,14 @@ type MarketState struct {
 	SourceBadge        string
 	LegacyCompat       string
 	Bid, Ask, Mid      float64
+	HistoryStatus      string
+	FeatPrice          string
+	FeatMomentum       string
+	FeatVol            string
+	FeatCross          string
+	FeatLegacy         string
+	TapeState          string
+	QuoteHealth        string
 }
 
 type WorldState struct {
@@ -124,6 +132,9 @@ type WorldState struct {
 	Used         []UsedObs
 	Hash         string
 	Live         livesurface.Frame
+	SlowAt       time.Time
+	LiveAt       time.Time
+	MicroAt      time.Time
 }
 
 func At(t time.Time, in Input) WorldState {
@@ -173,6 +184,7 @@ func At(t time.Time, in Input) WorldState {
 	} else {
 		ws.Valid = "FIXTURE_OR_TEST"
 	}
+	ws.SlowAt = t
 	return Finalize(ws)
 }
 

@@ -63,6 +63,22 @@ func TestAttentionSetupCandidateNotOrder(t *testing.T) {
 	}
 }
 
+func TestInsufficientVsNoSetup(t *testing.T) {
+	d := New()
+	r := opportunity.Ranked{Market: "GOLD", State: worldstate.MarketState{Market: "GOLD", Eligibility: worlddomain.EligAnalysis, DataQuality: worlddomain.HealthHealthy}}
+	ins := d.ProposeWith(worldstate.WorldState{Hash: "h"}, r, "", "", worlddomain.EligAnalysis, nil, Extra{})
+	if ins.Setup != worlddomain.SetupInsufficient {
+		t.Fatalf("want INSUFFICIENT_DATA got %s", ins.Setup)
+	}
+	no := d.ProposeWith(worldstate.WorldState{Hash: "h"}, r, "", "", worlddomain.EligAnalysis, nil, Extra{HistoryKnown: true, HistoryPresent: true})
+	if no.Setup != worlddomain.SetupNoSetup {
+		t.Fatalf("want NO_SETUP got %s", no.Setup)
+	}
+	if no.WhySetup == "" || ins.MissingData == "" {
+		t.Fatal("explanation")
+	}
+}
+
 func TestDuplicateBlockersRemoved(t *testing.T) {
 	d := New()
 	p := d.ProposeFull(worldstate.WorldState{Hash: "h"}, opportunity.Ranked{

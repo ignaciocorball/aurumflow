@@ -72,6 +72,7 @@ func main() {
 	worldSnap := flag.Bool("world-snapshot", false, "write CurrentWorldState from LIVE/CACHE official sources (no broker mutation)")
 	fixtureWorld := flag.Bool("fixture-world", false, "explicit test/offline fixture WorldState (never default for shadow/demo)")
 	globalShadow := flag.Bool("global-shadow", false, "multi-market SHADOW proposals from official WorldState (no orders)")
+	intelRuntime := flag.Bool("intelligence-runtime", false, "unified intelligence SHADOW (WorldState+Capital+BTC micro; no ExecutionProvider)")
 	prepareMarket := flag.String("prepare-market", "", "READ-ONLY Capital discovery/spec for a canonical market")
 	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
 	prepareUniverse := flag.Bool("prepare-demo-universe", false, "READ-ONLY prepare matrix for all resolved Capital markets (no orders)")
@@ -152,6 +153,14 @@ func main() {
 	}
 	if *sundayRuntime {
 		runSundayRuntime(context.Background(), *soakMin, *l2Provider)
+		return
+	}
+	if *intelRuntime {
+		addr := *statusAddr
+		if addr == "127.0.0.1:8765" {
+			addr = "127.0.0.1:8766"
+		}
+		runIntelligenceRuntime(context.Background(), *soakMin, addr, *l2Provider)
 		return
 	}
 	if *shadowRuntime {

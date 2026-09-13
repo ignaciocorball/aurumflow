@@ -107,11 +107,40 @@ canvas{width:100%;display:block;background:#0d1219}
     </div>
     <div class="kv" id="gkv"></div>
     <div class="note" id="truth">Official origin: WAITING</div>
+    <div class="note">Official context · Live price · History readiness · Micro readiness are separate. No single confidence.</div>
+    <div class="kv" id="dqkv"></div>
+  </section>
+  <section class="box">
+    <h2>SESSION STRIP · 24h</h2>
+    <div class="note">Clock-descriptive. Broker marketStatus remains authoritative.</div>
+    <div class="map" id="sstrip">
+      <div class="reg"><span class="dot"></span><b>TOKYO</b><span id="ss-tyo">—</span></div>
+      <div class="reg"><span class="dot"></span><b>HONG KONG</b><span id="ss-hk">—</span></div>
+      <div class="reg"><span class="dot"></span><b>LONDON</b><span id="ss-lon">—</span></div>
+      <div class="reg"><span class="dot"></span><b>NEW YORK</b><span id="ss-ny">—</span></div>
+    </div>
+    <div class="note" id="sslead">Regional leadership: WAITING</div>
   </section>
   <section class="box">
     <h2>WORLD MARKET TAPE</h2>
-    <div class="note">Live Capital price plane. CLOSED / STALE quotes are not current momentum.</div>
-    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>Attention</th><th>Coverage</th><th>Tier</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
+    <div class="note">LIVE · CLOSED · STALE · WARMING. CLOSED / STALE quotes are not current momentum.</div>
+    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Tape</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>H</th><th>M</th><th>V</th><th>X</th><th>L</th><th>μ</th><th>Attention</th><th>Coverage</th><th>Tier</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section class="box">
+    <h2>MARKET COMPARISON</h2>
+    <div class="note">Normalized price paths. CORRELATION ≠ CAUSATION.</div>
+    <div class="tabs">
+      <button type="button" class="tab on" data-cmp="GOLD,SILVER">GOLD vs SILVER</button>
+      <button type="button" class="tab" data-cmp="US100,US500">US100 vs US500</button>
+      <button type="button" class="tab" data-cmp="DE40,UK100">DE40 vs UK100</button>
+      <button type="button" class="tab" data-cmp="J225,CN50">J225 vs CN50</button>
+    </div>
+    <div class="kv" id="cmpkv"></div>
+  </section>
+  <section class="box">
+    <h2>PORTFOLIO RISK</h2>
+    <div class="note">Limits use account_currency_risk. Unknown monetary risk → BLOCK.</div>
+    <div class="kv" id="riskkv"></div>
   </section>
   <section class="box">
     <h2>GLOBAL HEATMAP</h2>
@@ -683,6 +712,21 @@ function paintWorld(w){
   kv('flows', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')+' '+((f.Strength||0))]}));
   kv('flowev', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')]}));
   el('gtl').textContent='Session '+ (w.Session||'WAITING') +' · Tokyo → Hong Kong → London → New York';
+  paintSessionStrip(w);
+  paintCompare(w);
+  kv('riskkv',[
+    ['Unit', 'account_currency_risk'],
+    ['Aggregate risk cap', '$300 DEMO'],
+    ['Per region / asset', '$150 DEMO'],
+    ['Used', 'UNKNOWN until monetary calibration'],
+    ['Groups', 'US_EQUITY_INDEX · PRECIOUS_METALS · ENERGY · EUROPE_EQUITY · ASIA_EQUITY · CRYPTO']
+  ]);
+  kv('dqkv',[
+    ['Official context', (document.getElementById('truth')&&el('truth').textContent)||'WAITING'],
+    ['Live price coverage', liveCov(w)],
+    ['History readiness', histCov(w)],
+    ['Micro readiness', (mget(w,'BTC').MicroAvailable?'BTC sensors healthy':'BTC micro unavailable')]
+  ]);
 }
 function mget(w,id){return (w.Markets&&w.Markets[id])||{}}
 function feat(w,id){return (w.Live&&w.Live.Features&&w.Live.Features[id])||{}}
@@ -696,7 +740,7 @@ function paintTape(w){
     var m=Object.assign({},mget(w,id),opp[id]||{});
     var f=feat(w,id);
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+id+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid),m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Tier||'—')+'</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
+    tr.innerHTML='<td>'+id+'</td><td>'+(m.TapeState||tapeOf(m))+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid),m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+dot(m.HistoryStatus||m.FeatLegacy)+'</td><td>'+dot(m.FeatMomentum)+'</td><td>'+dot(m.FeatVol)+'</td><td>'+dot(m.FeatCross)+'</td><td>'+dot(m.FeatLegacy)+'</td><td>'+(m.MicroAvailable?'●':'○')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Tier||'—')+'</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
     tb.appendChild(tr);
   });
 }
@@ -728,7 +772,64 @@ function paintRotation(w){
     ['Precious metals', (L.Precious&&L.Precious.GoldRS)||'UNKNOWN'],
     ['Energy', (L.Energy&&L.Energy.OilMomentum)||'UNKNOWN'],
     ['Crypto', (mget(w,'BTC').PriceTrend)||'UNKNOWN'],
-    ['Label', 'PRICE LEADERSHIP']
+    ['Label', 'PRICE LEADERSHIP'],
+    ['Note', 'CORRELATION ≠ CAUSATION']
+  ]);
+}
+function tapeOf(m){
+  if(m.QuoteHealth==='STALE') return 'STALE';
+  if(String(m.MarketStatus||'').toUpperCase()==='TRADEABLE') return 'LIVE';
+  if((m.HistoryStatus||'')==='WARMING') return 'WARMING';
+  return 'CLOSED';
+}
+function dot(v){
+  v=String(v||'');
+  if(v.indexOf('READY')>=0||v==='PRICE_LIVE'||v==='READY') return '●';
+  if(v==='WARMING'||v==='NOT_READY') return '○';
+  return '·';
+}
+function liveCov(w){
+  var n=0,k=0,M=w.Markets||{};
+  Object.keys(M).forEach(function(id){k++; if(M[id].TapeState==='LIVE'||String(M[id].MarketStatus||'').toUpperCase()==='TRADEABLE') n++;});
+  return n+' / '+k+' TRADEABLE';
+}
+function histCov(w){
+  var n=0,k=0,M=w.Markets||{};
+  Object.keys(M).forEach(function(id){k++; if((M[id].HistoryStatus||'')==='READY') n++;});
+  return n+' / '+k+' READY';
+}
+function paintSessionStrip(w){
+  var t=new Date(w.AsOf||Date.now());
+  var h=t.getUTCHours();
+  function st(open0,open1,pre){
+    if(h>=open0&&h<open1) return 'OPEN';
+    if(pre!=null&&h>=pre&&h<open0) return 'TRANSITION';
+    return 'CLOSED';
+  }
+  if(el('ss-tyo')) el('ss-tyo').textContent=st(0,8,23);
+  if(el('ss-hk')) el('ss-hk').textContent=st(1,8,0);
+  if(el('ss-lon')) el('ss-lon').textContent=st(7,16,6);
+  if(el('ss-ny')) el('ss-ny').textContent=st(13,21,12);
+  var L=w.Live||{};
+  if(el('sslead')) el('sslead').textContent='Regional leadership (price, not capital flow): Asia '+(L.Asia&&L.Asia.Leadership||'UNKNOWN')+' · Europe '+(L.Europe&&L.Europe.Leadership||'UNKNOWN')+' · US '+(L.Breadth&&L.Breadth.State||'UNKNOWN');
+}
+var cmpPair=['GOLD','SILVER'];
+document.querySelectorAll('[data-cmp]').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('[data-cmp]').forEach(function(x){x.className='tab'});
+    b.className='tab on';
+    cmpPair=b.getAttribute('data-cmp').split(',');
+    fetch('/api/world').then(function(r){return r.json()}).then(paintCompare).catch(function(){});
+  };
+});
+function paintCompare(w){
+  if(!w) return;
+  var a=cmpPair[0], b=cmpPair[1];
+  var fa=feat(w,a), fb=feat(w,b);
+  kv('cmpkv',[
+    [a+' 1h', pct(fa.Ret1h)],
+    [b+' 1h', pct(fb.Ret1h)],
+    ['Label', 'normalized path · CORRELATION ≠ CAUSATION']
   ]);
 }
 function paintSources(j){

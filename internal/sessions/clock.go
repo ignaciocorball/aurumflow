@@ -91,6 +91,21 @@ func Handoff(prev, cur Phase, t time.Time) (HandoffSnapshot, bool) {
 	return HandoffSnapshot{At: t.UTC(), Phase: cur, Event: ev, Note: "descriptive session handoff, no causality"}, true
 }
 
+type StatusTransition struct {
+	Market string
+	From   string
+	To     string
+	At     time.Time
+}
+
+func BrokerTransition(market, prev, cur string, t time.Time) (StatusTransition, bool) {
+	prev, cur = strings.ToUpper(strings.TrimSpace(prev)), strings.ToUpper(strings.TrimSpace(cur))
+	if prev == cur || cur == "" {
+		return StatusTransition{}, false
+	}
+	return StatusTransition{Market: market, From: prev, To: cur, At: t.UTC()}, true
+}
+
 const (
 	MarketPreopen = "PREOPEN"
 	MarketOpen    = "OPEN"

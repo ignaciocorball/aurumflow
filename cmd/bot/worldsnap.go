@@ -9,19 +9,29 @@ import (
 	"sync"
 
 	"aurumflow/internal/eligibility"
+	"aurumflow/internal/featready"
 	"aurumflow/internal/globalsources"
+	"aurumflow/internal/legacycompat"
+	"aurumflow/internal/livesurface"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/microcap"
+	"aurumflow/internal/mktwarmup"
 	"aurumflow/internal/opportunity"
 	"aurumflow/internal/ops"
 	"aurumflow/internal/orchestrator"
+	"aurumflow/internal/quotehealth"
+	"aurumflow/internal/research"
+	"aurumflow/internal/researchopp"
 	"aurumflow/internal/scanner"
+	"aurumflow/internal/sessions"
 	"aurumflow/internal/worldstate"
+	"aurumflow/pkg/models"
 )
 
 var (
 	slowMu   sync.Mutex
 	slowHold worldstate.WorldState
+	prevOpp  = map[string]*researchopp.Signal{}
 )
 
 func runWorldSnapshot(fixture bool) {
@@ -172,8 +182,12 @@ func publishWorld(srv *ops.Server, fixture bool) {
 	}
 	st := srv.Get()
 	in.Micro = microcap.BTCFromRuntime(true, st.L2QuotesOK || st.BookSynced, st.LastPressure != 0 || st.L2QuotesOK, st.LastV1Class != "", st.Absorption != 0 || strings.Contains(strings.ToUpper(st.LastV1Class), "ABSORB"), healthFromStatus(st))
-	in.BTCMicro = in.Micro.Healthy()
+	in.BTCMicro = applyIntelMicro(st)
 	ws := worldstate.At(now, in)
+	ws.SlowAt = now
+	if lastFrameOK {
+		ws = worldstate.ApplyLiveFrame(ws, lastFrame)
+	}
 	elig := eligibility.New()
 	ws = elig.ApplyToWorld(ws)
 	ranks := opportunity.Rank(ws)
@@ -205,15 +219,32 @@ func publishWorld(srv *ops.Server, fixture bool) {
 	} else if fixture {
 		truth = "FIXTURE"
 	}
+	if peer := goldPeerCopy(); peer != nil {
+		srv.SetSources(map[string]any{
+			"sources":     reg.All(),
+			"catalog":     globalsources.Catalog(),
+			"calendar":    globalsources.Calendar(now, globalsources.LastActuals()),
+			"eligibility": elig.All(),
+			"truth":       truth,
+			"valid":       ws.Valid,
+			"gold_peer":   peer,
+			"risk_unit":   "account_currency_risk",
+			"risk_cap":    "Aggregate risk cap: $300 DEMO",
+		})
+	} else {
+		srv.SetSources(map[string]any{
+			"sources":     reg.All(),
+			"catalog":     globalsources.Catalog(),
+			"calendar":    globalsources.Calendar(now, globalsources.LastActuals()),
+			"eligibility": elig.All(),
+			"truth":       truth,
+			"valid":       ws.Valid,
+			"risk_unit":   "account_currency_risk",
+			"risk_cap":    "Aggregate risk cap: $300 DEMO",
+		})
+	}
 	srv.SetWorld(ws)
-	srv.SetSources(map[string]any{
-		"sources":     reg.All(),
-		"catalog":     globalsources.Catalog(),
-		"calendar":    globalsources.Calendar(now, globalsources.LastActuals()),
-		"eligibility": elig.All(),
-		"truth":       truth,
-		"valid":       ws.Valid,
-	})
+	bumpWorld()
 }
 
 func refreshWorld(srv *ops.Server, fixture bool) {
@@ -264,19 +295,150 @@ func materializeLive(srv *ops.Server) {
 	if ws.AsOf.IsZero() {
 		return
 	}
+	now := time.Now().UTC()
+	if intelOn && demoEnvConfigured() && now.Sub(lastQuoteAt) >= 30*time.Second {
+		maps := cachedMaps()
+		if frame, ok := collectCapitalFrame(context.Background(), maps, now); ok {
+			lastFrame = frame
+			lastFrameOK = true
+			lastQuoteAt = now
+			stale, open, n := 0, 0, 0
+			for _, q := range frame.Quotes {
+				n++
+				if q.Stale {
+					stale++
+				}
+				if q.Live {
+					open++
+				}
+				if tr, ok := sessions.BrokerTransition(q.Market, prevStatus[q.Market], q.MarketStatus, now); ok {
+					logger.Info("MARKET TRANSITION %s %s → %s", tr.Market, tr.From, tr.To)
+					prevStatus[q.Market] = q.MarketStatus
+				} else if prevStatus[q.Market] == "" {
+					prevStatus[q.Market] = q.MarketStatus
+				}
+			}
+			bumpQuotes(n, stale, open)
+		} else if !lastQuoteAt.IsZero() && now.Sub(lastQuoteAt) > 3*time.Minute {
+			lastFrameOK = false
+			bumpErr()
+		}
+	}
+	if lastFrameOK {
+		ws = worldstate.ApplyLiveFrame(ws, lastFrame)
+	}
 	st := srv.Get()
 	ws.Markets = cloneMarkets(ws.Markets)
 	if btc, ok := ws.Markets["BTC"]; ok {
-		cap := microcap.BTCFromRuntime(true, st.L2QuotesOK || st.BookSynced, st.LastPressure != 0 || st.L2QuotesOK, st.LastV1Class != "", st.Absorption != 0, healthFromStatus(st))
-		btc.MicroAvailable = cap.Healthy()
+		btc.MicroAvailable = applyIntelMicro(st)
+		if btc.MicroAvailable {
+			ws.MicroAt = now
+		}
 		ws.Markets["BTC"] = btc
+	}
+	goldLegacy := ""
+	if !intelOn {
+		ws = worldstate.Finalize(ws)
+		ranks := opportunity.Rank(ws)
+		ws = scanner.AttachOpportunity(ws, ranks)
+		srv.SetWorld(ws)
+		return
+	}
+	for id, stt := range ws.Markets {
+		h := historyOf(id)
+		q := lastFrame.Quotes[id]
+		f := lastFrame.Features[id]
+		fr := featready.Assess(id, q, f, h)
+		histMu.Lock()
+		featByMkt[id] = fr
+		histMu.Unlock()
+		stt.HistoryStatus = h.Status
+		stt.FeatPrice, stt.FeatMomentum, stt.FeatVol, stt.FeatCross, stt.FeatLegacy = fr.Price, fr.Momentum, fr.Volatility, fr.CrossAsset, fr.Legacy
+		stt.TapeState = quotehealth.TapeState(q, h.Status)
+		stt.QuoteHealth = string(quotehealth.Of(q, 1, 30*time.Second, 0).Status)
+		stt.LegacyCompat = legacycompat.Of(id).Status
+		ws.Markets[id] = stt
+		if id == "GOLD" && h.Status == mktwarmup.StatusReady {
+			goldLegacy = evalGoldLegacy(h)
+		}
 	}
 	ws = worldstate.Finalize(ws)
 	elig := eligibility.New()
+	ws = elig.ApplyToWorld(ws)
 	ranks := opportunity.Rank(ws)
+	orch := orchestrator.New()
+	for i, r := range ranks {
+		h := historyOf(r.Market)
+		ready := h.Status == mktwarmup.StatusReady
+		legacy := ""
+		if r.Market == "GOLD" {
+			legacy = goldLegacy
+		}
+		extra := orchestrator.Extra{WorldHash: ws.Hash, HistoryKnown: true, HistoryPresent: ready && r.Market == "GOLD"}
+		if r.Market != "GOLD" {
+			extra.HistoryPresent = false
+			extra.HistoryKnown = true
+		}
+		p := orch.ProposeWith(ws, r, legacy, "", r.State.Eligibility, []string{"unknown monetary risk blocks new order"}, extra)
+		stt := r.State
+		stt.Proposal = p.Decision
+		stt.Setup = p.Setup
+		stt.Attention = r.Score
+		stt.Coverage = r.Coverage
+		ranks[i].State = stt
+		sig := researchopp.Stamp(researchopp.Signal{
+			ID: r.Market + "-" + now.Format("200601021504"), T0: now, WorldHash: ws.Hash,
+			Proposal: jsonBytes(p), Ranking: jsonBytes(r), MarketState: jsonBytes(stt),
+			Tier: string(r.Tier), Eligibility: string(r.State.Eligibility),
+			Session: string(ws.Session), MarketStatus: stt.MarketStatus, HistoryReady: stt.HistoryStatus,
+			Attention: r.Score, Coverage: r.Coverage, Legacy: string(p.Setup),
+			Micro: map[bool]string{true: "AVAILABLE", false: "UNAVAILABLE"}[stt.MicroAvailable],
+			ProposalLabel: p.Decision, DataQuality: string(stt.DataQuality),
+		})
+		if researchopp.ShouldRecord(prevOpp[r.Market], sig) {
+			_ = researchopp.Record("journals", sig)
+			cp := sig
+			prevOpp[r.Market] = &cp
+			bumpOpp()
+		}
+		bumpProposal()
+	}
 	ws = scanner.AttachOpportunity(ws, ranks)
 	_ = elig
 	srv.SetWorld(ws)
+}
+
+func evalGoldLegacy(h mktwarmup.History) string {
+	bars := h.M15Bars
+	if len(bars) < 21 {
+		bars = h.M5Bars
+	}
+	if len(bars) < 21 || len(h.H1Bars) < 5 || len(h.H4Bars) < 3 {
+		return ""
+	}
+	toM := func(xs []livesurface.Candle) []models.Candle {
+		var out []models.Candle
+		for _, c := range xs {
+			out = append(out, models.Candle{Time: c.Time, Open: c.Close, High: c.High, Low: c.Low, Close: c.Close})
+		}
+		return out
+	}
+	bumpLegacy()
+	cfg := research.CryptoResearchConfig()
+	cfg.Crypto = false
+	cfg.TradingSessions = []string{"LONDON", "NY"}
+	sigs := research.ScanLegacy(toM(bars), toM(h.H1Bars), toM(h.H4Bars), cfg)
+	if len(sigs) == 0 {
+		return ""
+	}
+	last := sigs[len(sigs)-1]
+	if last.Direction > 0 {
+		return "LONG"
+	}
+	if last.Direction < 0 {
+		return "SHORT"
+	}
+	return ""
 }
 
 func cloneMarkets(in map[string]worldstate.MarketState) map[string]worldstate.MarketState {

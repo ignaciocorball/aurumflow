@@ -32,4 +32,8 @@ func TestPhaseAndHandoff(t *testing.T) {
 	if MarketHours("BTC", "", asia) != MarketOpen {
 		t.Fatal("btc")
 	}
+	tr, ok := BrokerTransition("GOLD", "CLOSED", "TRADEABLE", us)
+	if !ok || tr.To != "TRADEABLE" {
+		t.Fatal(tr, ok)
+	}
 }

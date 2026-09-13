@@ -84,3 +84,12 @@ func TestRollingCorrInsufficient(t *testing.T) {
 		t.Fatal("emitted without coverage")
 	}
 }
+
+func TestCompareNormalized(t *testing.T) {
+	a := []Candle{{Close: 100}, {Close: 110}}
+	b := []Candle{{Close: 50}, {Close: 50}}
+	l, r := CompareNormalized(a, b, 8)
+	if len(l) != 2 || l[1] < 109 || r[1] != 100 {
+		t.Fatal(l, r)
+	}
+}

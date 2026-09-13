@@ -2,6 +2,7 @@ package demoprep
 
 import (
 	"sort"
+	"strings"
 
 	"aurumflow/internal/eligibility"
 	"aurumflow/internal/instrument"
@@ -92,6 +93,70 @@ func Queue(rows []Row, ranks []opportunity.Ranked) []QueueItem {
 		return q[i].Market < q[j].Market
 	})
 	return q
+}
+
+const (
+	CalReady       = "READY_TO_CALIBRATE"
+	CalClosed      = "NOT_TRADEABLE"
+	CalSpecInvalid = "SPEC_INVALID"
+	CalUnresolved  = "IDENTITY_UNRESOLVED"
+	CalRiskUnknown = "RISK_UNKNOWN"
+)
+
+func CalState(r Row) string {
+	if r.Epic == "" || !r.Discovered {
+		return CalUnresolved
+	}
+	if !r.SpecValid {
+		return CalSpecInvalid
+	}
+	if r.MoneyConfidence == "UNKNOWN" || r.MonetaryMeta == "UNKNOWN" {
+		return CalRiskUnknown
+	}
+	if !r.Tradeable {
+		return CalClosed
+	}
+	return CalReady
+}
+
+func RecommendAfterGold(rows []Row) (string, string) {
+	order := []string{"SILVER", "US100", "OIL_CRUDE", "US500"}
+	best, reason := "", "no market meets gates"
+	bestN := -1
+	for _, id := range order {
+		for _, r := range rows {
+			if r.Market != id {
+				continue
+			}
+			n := 0
+			why := []string{}
+			if r.Tradeable {
+				n += 4
+				why = append(why, "TRADEABLE")
+			}
+			if r.Discovered && r.Epic != "" {
+				n += 2
+				why = append(why, "identity")
+			}
+			if r.SpecValid {
+				n += 2
+				why = append(why, "spec")
+			}
+			if r.Legacy == "LEGACY_COMPATIBLE" || r.Legacy == "LEGACY_NEEDS_CONFIG" {
+				n += 1
+				why = append(why, "legacy="+r.Legacy)
+			}
+			if n > bestN {
+				bestN = n
+				best = id
+				reason = id + " suitability (not forecasted profit): " + strings.Join(why, ", ")
+			}
+		}
+	}
+	if best == "" {
+		return "NONE", "evaluate SILVER / US100 / OIL / US500 after GOLD when TRADEABLE — not hardcoded"
+	}
+	return best, reason
 }
 
 func ReadyNames(q []QueueItem) []string {

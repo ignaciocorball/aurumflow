@@ -26,4 +26,10 @@ func TestWorldStateHashDeterministic(t *testing.T) {
 	if c.Hash == "" || c.Hash == a.Hash {
 		t.Fatal("evidence change must change hash")
 	}
+	a.SlowAt = now.Add(time.Hour)
+	a.LiveAt = now.Add(2 * time.Hour)
+	a.MicroAt = now.Add(3 * time.Hour)
+	if Hash(a) != b.Hash {
+		t.Fatal("WORLD_HASH_V1 must ignore layer timestamps")
+	}
 }

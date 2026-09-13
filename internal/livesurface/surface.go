@@ -569,6 +569,33 @@ func tailDur(xs []Candle, d time.Duration) []Candle {
 	return out
 }
 
+// CompareNormalized returns aligned last-n close paths scaled to 100 at the first overlap.
+// Descriptive only. Correlation is not causation.
+func CompareNormalized(a, b []Candle, n int) (left, right []float64) {
+	if n <= 1 {
+		n = 24
+	}
+	if len(a) < 2 || len(b) < 2 {
+		return nil, nil
+	}
+	if len(a) > n {
+		a = a[len(a)-n:]
+	}
+	if len(b) > n {
+		b = b[len(b)-n:]
+	}
+	if a[0].Close <= 0 || b[0].Close <= 0 {
+		return nil, nil
+	}
+	for _, c := range a {
+		left = append(left, 100*c.Close/a[0].Close)
+	}
+	for _, c := range b {
+		right = append(right, 100*c.Close/b[0].Close)
+	}
+	return left, right
+}
+
 func Assemble(now time.Time, quotes map[string]Quote, hist map[string][]Candle) Frame {
 	f := Frame{AsOf: now.UTC(), Quotes: quotes, Features: map[string]Features{}}
 	live := map[string]bool{}

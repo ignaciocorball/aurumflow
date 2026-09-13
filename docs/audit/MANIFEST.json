@@ -23,6 +23,7 @@
   "p7_1_freeze": "READY",
   "p8_freeze": "READY_SHADOW",
   "p8_1_freeze": "READY_SHADOW",
+  "p8_2_freeze": "READY_PREOPEN",
   "multi_market_demo_execution": "OFF",
   "capital_demo_execution_plane": "VERIFIED_WORKING",
   "p0_snapshot": {
@@ -296,13 +297,13 @@
   "tests_current": {
     "command": "go test ./... -count=1",
     "result": "PASS",
-    "pass": 296,
+    "pass": 330,
     "fail": 0,
     "skip": 0,
     "vet": "PASS",
     "build": "PASS",
     "capital_integration": "LIFECYCLE_VERIFIED_BTCUSD",
-    "note": "Real go test ./... -count=1 on 2026-09-13 after P7.1 official live mesh + P8 shadow. P0 tests.pass remains the historical photograph."
+    "note": "Real go test ./... -count=1 on 2026-09-13 after P8.2 unified intelligence (PREOPEN). P0 tests.pass remains the historical photograph."
   },
   "p5_4": {
     "freeze": "READY",
@@ -425,7 +426,8 @@
     {"phase": "P7", "name": "Global Capital Surface", "status": "READY_SHADOW"},
     {"phase": "P7.1", "name": "Official Live World Mesh", "status": "READY"},
     {"phase": "P8", "name": "Multi-Market Shadow Orchestrator", "status": "READY_SHADOW"},
-    {"phase": "P8.1", "name": "Live Cross-Asset Surface", "status": "READY_SHADOW"}
+    {"phase": "P8.1", "name": "Live Cross-Asset Surface", "status": "READY_SHADOW"},
+    {"phase": "P8.2", "name": "Unified Intelligence Runtime", "status": "READY_PREOPEN"}
   ],
   "documents": [
     "docs/audit/00_EXECUTIVE_SUMMARY.md",
@@ -505,6 +507,12 @@
     "docs/audit/74_P8_1_LEGACY_MULTI_INSTRUMENT.md",
     "docs/audit/75_P8_1_LIVE_SURFACE.md",
     "docs/audit/76_P8_1_FREEZE_REPORT.md",
+    "docs/audit/77_P8_2_UNIFIED_INTELLIGENCE_RUNTIME.md",
+    "docs/audit/78_P8_2_MARKET_HISTORY_WARMUP.md",
+    "docs/audit/79_P8_2_LEGACY_MULTI_MARKET_AUDIT.md",
+    "docs/audit/80_P8_2_ACTIVE_SESSION_VALIDATION.md",
+    "docs/audit/81_P8_2_DEMO_OPERATIONAL_TRUST.md",
+    "docs/audit/82_P8_2_FREEZE_REPORT.md",
     "docs/audit/P1_LOCAL_CORPUS_MANIFEST.md",
     "docs/audit/MANIFEST.json"
   ]
