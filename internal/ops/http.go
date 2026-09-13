@@ -130,6 +130,16 @@ func (s *Server) apiGold(w http.ResponseWriter, _ *http.Request) {
 		"legacy":        emptyNA(st.LastStrategy),
 		"kill_switch":   st.KillSwitch,
 		"execution_started": st.ExecutionMode == "DEMO",
+		"strategy_session": st.StrategySession,
+		"strategy_ready":   st.StrategyReady,
+		"strategy_waiting": st.StrategyWaiting,
+		"next_session":     st.NextSession,
+		"last_scan":        st.LastScan,
+		"last_signal":      st.LastSignal,
+		"trade_count":      st.TradeCount,
+		"max_trades":       st.MaxTrades,
+		"monetary_status":  st.MonetaryStatus,
+		"operational_trust": st.OperationalTrust,
 	}
 	if st.GoldQuotesOK {
 		out["bid"], out["ask"], out["spread"] = st.GoldBid, st.GoldAsk, st.GoldSpread

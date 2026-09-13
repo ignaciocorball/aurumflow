@@ -78,6 +78,7 @@ func main() {
 	prepareMarket := flag.String("prepare-market", "", "READ-ONLY Capital discovery/spec for a canonical market")
 	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
 	prepareUniverse := flag.Bool("prepare-demo-universe", false, "READ-ONLY prepare matrix for all resolved Capital markets (no orders)")
+	auditTrade := flag.String("audit-strategy-trade", "", "read-only reconstruct a strategy trade forensic package")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -99,6 +100,10 @@ func main() {
 	}
 	if *statusOnly {
 		runStatusInspect("http://" + *statusAddr)
+		return
+	}
+	if *auditTrade != "" {
+		runAuditStrategyTrade(*auditTrade)
 		return
 	}
 	if *haltOrders {

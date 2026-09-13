@@ -49,6 +49,7 @@ research/prospective/**/signal_outcomes.jsonl
 /artifacts
 /research/raw
 /research/work
+/research/strategy-trades
 AurumFlow.md
 
 # Firebase / secrets (never commit)

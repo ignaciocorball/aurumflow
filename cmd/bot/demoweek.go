@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -22,9 +24,11 @@ import (
 	"aurumflow/internal/money"
 	"aurumflow/internal/ops"
 	"aurumflow/internal/radar"
+	"aurumflow/internal/optrust"
 	"aurumflow/internal/recovery"
 	"aurumflow/internal/research"
 	"aurumflow/internal/strategy"
+	"aurumflow/internal/stratrade"
 	"aurumflow/pkg/models"
 )
 
@@ -122,6 +126,13 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	}()
 	logger.Info("status surface listening (healthz/status)")
 
+	week, werr := stratrade.LoadWeek(stratrade.WeekPath("journals", epic), epic, sess.cfg.Risk.MaxTrades)
+	if werr != nil {
+		logger.Warn("strategy week state: %v — starting empty", werr)
+	}
+	if week.BlocksNewStrategy() {
+		logger.Warn("strategy week already completed %d/%d trades — no additional strategy opens", week.Snapshot().CompletedStrategyTrades, week.Snapshot().MaxTrades)
+	}
 	loop := core.NewLoop(sess.cfg, sess.client, epic, sess.acc.Balance.Balance, len(pos.Positions))
 	loop.InstanceID = epic + "-demo-week"
 	loop.RunID = uuid.New().String()
@@ -130,6 +141,13 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	loop.UnknownPositions = unknown
 	loop.RequireRuntimeMoney = true
 	loop.Money = cached
+	loop.Week = week
+	loop.GitCommit = gitHead()
+	loop.StrategyVersion = "LEGACY"
+	loop.Forensic = stratrade.NewRecorder(filepath.Join("research", "strategy-trades"), "")
+	loop.ObserveIntel = func() stratrade.IntelligenceContext {
+		return peekIntelligence("http://127.0.0.1:8766")
+	}
 	loop.Decision = &strategy.DecisionContext{RadarMode: radar.ModeShadow}
 	loop.OnLegacySignal = func(sig *models.TradeSignal, now time.Time) {
 		if sig == nil || exhaustion.MayMutateBroker() || radar.MayMutateBroker(radar.ModeShadow) {
@@ -201,6 +219,7 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				cur.UptimeSeconds = ops.AgeSeconds(started)
 				cur.KillSwitch = ks.HaltNewOrders()
 				cur.LastStrategy = loop.LastSignalText
+				cur.LastExecution = loop.DecisionText()
 				if loop.Decision != nil {
 					cur.RadarState = loop.Decision.RadarState
 					cur.Pressure = loop.Decision.Pressure
@@ -220,8 +239,83 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				cur.ProspectiveTotal = pst.Signals
 				cur.ProspectiveExh = pst.Exhaustion
 				if pr, err := sess.client.GetPositions(runCtx); err == nil {
-					cur.OpenPositions = len(pr.Positions)
+					n := 0
+					for _, p := range pr.Positions {
+						if p.GetEpic() == epic {
+							n++
+							cur.GoldEntry = p.Position.Level
+							cur.GoldUPnL = p.Position.ProfitLoss
+							if p.Position.Upnl != 0 {
+								cur.GoldUPnL = p.Position.Upnl
+							}
+							cur.GoldSL = p.Position.StopLevel
+							cur.GoldTP = p.Position.ProfitLevel
+						}
+					}
+					cur.OpenPositions = n
 					cur.PositionsKnown = true
+				}
+				if md, err := sess.client.GetMarketDetails(runCtx, epic); err == nil && md != nil {
+					cur.MarketStatus = md.Snapshot.MarketStatus
+					cur.GoldBid = md.Snapshot.Bid
+					cur.GoldAsk = md.Snapshot.Offer
+					if cur.GoldAsk > cur.GoldBid {
+						cur.GoldSpread = cur.GoldAsk - cur.GoldBid
+					}
+					cur.GoldValidation = cached.ValidationStatus
+				}
+				sessv := loop.SessionView(cur.MarketStatus)
+				cur.StrategySession = sessv.StrategySession
+				cur.StrategyReady = sessv.StrategyReady
+				cur.StrategyWaiting = sessv.StrategyWaiting
+				cur.NextSession = sessv.NextSession
+				if !sessv.NextSessionAt.IsZero() {
+					cur.NextSessionAt = sessv.NextSessionAt.UTC().Format(time.RFC3339)
+				}
+				if !loop.LastScanAt.IsZero() {
+					cur.LastScan = loop.LastScanAt.UTC().Format(time.RFC3339)
+				}
+				cur.LastSignal = loop.LastSignalID
+				if !loop.LastSignalAt.IsZero() && cur.LastSignal == "" {
+					cur.LastSignal = loop.LastSignalAt.UTC().Format(time.RFC3339)
+				}
+				wk := week.Snapshot()
+				cur.TradeCount = wk.CompletedStrategyTrades
+				cur.MaxTrades = wk.MaxTrades
+				if cur.MaxTrades <= 0 {
+					cur.MaxTrades = sess.cfg.Risk.MaxTrades
+				}
+				cur.MonetaryStatus = cached.ValidationStatus
+				if sig := loop.OpenedSignal(); sig != nil {
+					cur.GoldEntry = sig.Entry
+					if cur.GoldSL == 0 {
+						cur.GoldSL = sig.StopLoss
+					}
+					if cur.GoldTP == 0 {
+						cur.GoldTP = sig.TakeProfit
+					}
+					stop := sig.Entry - sig.StopLoss
+					if stop < 0 {
+						stop = -stop
+					}
+					cur.ExpectedRisk = stratrade.ExpectedRiskUSD(0, stop, cached.MoneyPerPriceUnit)
+					if !loop.OpenedAt().IsZero() {
+						cur.HoldingSeconds = int64(time.Since(loop.OpenedAt()).Seconds())
+					}
+				}
+				cur.ObservationalNote = stratrade.LabelObservational
+				_, g := optrust.ForMarket(epic, true, true, cached.ValidationStatus == money.RuntimeValidated, cur.MarketStatus == "TRADEABLE")
+				sc := stratrade.EmptyScorecard()
+				if g.Monetary {
+					sc.Monetary = stratrade.TrustPASS
+				}
+				if week.BlocksNewStrategy() {
+					sc.Strategy = stratrade.TrustPASS
+				}
+				sc.Overall = stratrade.Overall(sc)
+				cur.OperationalTrust = sc.Overall
+				if halted, _ := loop.Forensic.Halted(); halted {
+					cur.OperationalTrust = stratrade.TrustFAIL
 				}
 				srv.Set(cur)
 			}
@@ -230,4 +324,40 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	logger.Info("demo-week loop starting execution_mode=%s radar=SHADOW live=impossible", execMode)
 	loop.Run(runCtx)
 	logger.Info("demo-week stopped")
+}
+
+func peekIntelligence(base string) stratrade.IntelligenceContext {
+	ctx := stratrade.NewObservational(stratrade.IntelligenceContext{DataQuality: "UNAVAILABLE"})
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Get(strings.TrimRight(base, "/") + "/api/world")
+	if err != nil {
+		return ctx
+	}
+	defer resp.Body.Close()
+	var raw map[string]any
+	if json.NewDecoder(resp.Body).Decode(&raw) != nil {
+		return ctx
+	}
+	ctx.WorldHash = asString(raw["Hash"])
+	if ctx.WorldHash == "" {
+		ctx.WorldHash = asString(raw["hash"])
+	}
+	if liq, ok := raw["Liquidity"].(map[string]any); ok {
+		ctx.Liquidity = asString(liq["Class"])
+	}
+	if risk, ok := raw["Risk"].(map[string]any); ok {
+		ctx.Risk = asString(risk["Class"])
+	}
+	ctx.DataQuality = "PEER_READ"
+	return ctx
+}
+
+func asString(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
 }

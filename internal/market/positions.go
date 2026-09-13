@@ -25,8 +25,10 @@ type PositionData struct {
 	Direction string `json:"direction"`
 	Level   float64 `json:"level"`
 	Epic       string  `json:"epic,omitempty"`
-	ProfitLoss float64 `json:"profitLoss,omitempty"`
-	Upnl       float64 `json:"upl,omitempty"`
+	ProfitLoss  float64 `json:"profitLoss,omitempty"`
+	Upnl        float64 `json:"upl,omitempty"`
+	StopLevel   float64 `json:"stopLevel,omitempty"`
+	ProfitLevel float64 `json:"profitLevel,omitempty"`
 }
 
 // GetEpic returns the epic for this position (from Market.Epic or Position.Epic).

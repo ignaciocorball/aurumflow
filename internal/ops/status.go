@@ -125,6 +125,20 @@ type Status struct {
 	LastEvent         string      `json:"last_event"`
 	PositionsKnown    bool        `json:"positions_known"`
 	Trades            int64       `json:"trades"`
+	StrategySession   string      `json:"strategy_session"`
+	StrategyReady     bool        `json:"strategy_ready"`
+	StrategyWaiting   string      `json:"strategy_waiting"`
+	NextSession       string      `json:"next_session"`
+	NextSessionAt     string      `json:"next_session_at"`
+	LastScan          string      `json:"last_scan"`
+	LastSignal        string      `json:"last_signal"`
+	TradeCount        int         `json:"trade_count"`
+	MaxTrades         int         `json:"max_trades"`
+	MonetaryStatus    string      `json:"monetary_status"`
+	OperationalTrust  string      `json:"operational_trust"`
+	ExpectedRisk      float64     `json:"expected_risk"`
+	HoldingSeconds    int64       `json:"holding_seconds"`
+	ObservationalNote string      `json:"observational_note"`
 }
 
 func NewStatus() Status {

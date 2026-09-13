@@ -23,6 +23,13 @@ func TestDisplayMissingNotZero(t *testing.T) {
 	}
 }
 
+func TestDecisionWhyOffHoursSession(t *testing.T) {
+	w := DecisionWhy(Status{StrategySession: "OFF_HOURS", NextSession: "LONDON", MarketStatus: "TRADEABLE"})
+	if !containsAll(w, "STRATEGY WAITING FOR SESSION", "LONDON") {
+		t.Fatal(w)
+	}
+}
+
 func TestDecisionWhyUsesEvidenceOnly(t *testing.T) {
 	st := Status{LastV1Class: "FLOW_EXHAUSTION_CONFIRM", DirectionalP: -18, LastLegacyDir: 1,
 		AggSell: 10, AggBuy: 2, FlowEfficiency: -0.4, ImpactFailure: 0.6,

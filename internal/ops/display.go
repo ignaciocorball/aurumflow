@@ -59,6 +59,14 @@ func V1Rail(class string) string {
 
 func DecisionWhy(st Status) string {
 	var lines []string
+	if strings.EqualFold(st.StrategySession, "OFF_HOURS") {
+		lines = append(lines, "STRATEGY WAITING FOR SESSION")
+		if st.NextSession != "" {
+			lines = append(lines, "NEXT "+st.NextSession)
+		}
+	} else if st.MarketStatus == "TRADEABLE" && !st.StrategyReady {
+		lines = append(lines, "STRATEGY WAITING")
+	}
 	switch V1Rail(st.LastV1Class) {
 	case "EXHAUSTION":
 		if st.DirectionalP < 0 {

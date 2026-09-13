@@ -306,7 +306,7 @@ body.dense .ov{gap:8px}
         <div class="hero-nm">GOLD</div>
         <div class="hero-px">CLOSED</div>
         <div>Awaiting broker TRADEABLE status</div>
-        <div class="note">NEXT · Runtime monetary calibration</div>
+        <div class="note">STRATEGY SESSION · OFF_HOURS is allowed</div>
       </div>
       <div id="gopen" hidden>
         <div class="kv" id="gexec"></div>
@@ -316,7 +316,7 @@ body.dense .ov{gap:8px}
     <section class="glass">
       <h2>Eligibility / operational trust</h2>
       <div class="gates" id="gates"></div>
-      <div class="note">Intelligence plane is separate from execution safety plane.</div>
+      <div class="note">OBSERVATIONAL · NOT EXECUTION INPUT</div>
     </section>
   </div>
   <section class="glass" style="margin-top:12px">
@@ -565,23 +565,39 @@ function paint(s){
   el('gclosed').hidden=!closed;
   el('gopen').hidden=closed;
   if(!closed){
-    kv('gexec',[
-      ['Market', 'TRADEABLE'],
+    var sess=txt(s.strategy_session);
+    var ready=s.strategy_ready?'READY':(s.strategy_waiting||'STRATEGY WAITING');
+    var rows=[
+      ['BROKER MARKET', 'TRADEABLE'],
+      ['STRATEGY SESSION', sess],
+      ['STRATEGY', ready],
+      ['Next session', txt(s.next_session)],
       ['Bid', num(s.gold_quotes_ok,s.gold_bid,2)],
       ['Ask', num(s.gold_quotes_ok,s.gold_ask,2)],
       ['Spread', num(s.gold_quotes_ok,s.gold_spread,3)],
-      ['Validation', txt(s.gold_validation)],
+      ['Monetary', txt(s.monetary_status)],
+      ['Trust', txt(s.operational_trust)],
+      ['Trades', (s.trade_count==null?miss():String(s.trade_count))+' / '+(s.max_trades==null?miss():String(s.max_trades))],
       ['Legacy', lg],
-      ['Open', s.positions_known?String(s.open_positions):miss()],
-      ['Entry', s.position_open?num(true,s.gold_entry,2):miss()],
-      ['SL', s.position_open?num(true,s.gold_sl,2):miss()],
-      ['TP', s.position_open?num(true,s.gold_tp,2):miss()],
-      ['uPnL', s.position_open?num(true,s.gold_upnl,2):miss()]
-    ]);
-    el('gpos').textContent=posVis(s);
+      ['Open', s.positions_known?String(s.open_positions):miss()]
+    ];
+    if(s.position_open){
+      rows=[
+        ['GOLD DEMO', lg==='NONE'?'OPEN':lg],
+        ['ENTRY', num(true,s.gold_entry,2)],
+        ['CURRENT', num(s.gold_quotes_ok,s.gold_bid,2)],
+        ['SL', num(true,s.gold_sl,2)],
+        ['TP', num(true,s.gold_tp,2)],
+        ['UPL', num(true,s.gold_upnl,2)],
+        ['EXPECTED RISK', num(isNum(s.expected_risk),s.expected_risk,2)],
+        ['HOLDING TIME', s.holding_seconds==null?miss():(s.holding_seconds+'s')]
+      ];
+    }
+    kv('gexec', rows);
+    el('gpos').textContent=s.position_open?posVis(s):(s.strategy_waiting||'STRATEGY WAITING');
   } else {
     el('gclosed').innerHTML='<div class="hero-nm">GOLD</div><div class="hero-px">'+(ms||'CLOSED')+'</div>'+
-      '<div>Awaiting broker TRADEABLE status</div><div class="note">NEXT · Runtime monetary calibration</div>';
+      '<div>BROKER MARKET · '+(ms||'WAITING')+'</div><div class="note">STRATEGY SESSION · '+txt(s.strategy_session)+'</div>';
   }
   kv('cvdkv',[
     ['CVD', num(isNum(s.cvd)&&s.cvd!==0,s.cvd,2)],
@@ -643,10 +659,11 @@ function paintGates(s){
     ['Identity', true],
     ['Market data', !!s.gold_quotes_ok||goldMS(s)!==''],
     ['History', false],
-    ['Strategy', false],
-    ['Monetary', false],
-    ['Lifecycle', false],
-    ['Risk', true]
+    ['Strategy', !!s.strategy_ready],
+    ['Monetary', String(s.monetary_status||'').indexOf('RUNTIME')>=0],
+    ['Risk', true],
+    ['Open', !!s.position_open],
+    ['Trust', String(s.operational_trust||'')==='PASS']
   ];
   el('gates').innerHTML=rows.map(function(r){return '<span>'+r[0]+'<b>'+(r[1]?'✓':'○')+'</b></span>'}).join('');
 }

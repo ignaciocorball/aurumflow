@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"aurumflow/internal/notifications"
 	"aurumflow/internal/risk"
 	"aurumflow/internal/strategy"
+	"aurumflow/internal/stratrade"
 	"aurumflow/internal/telemetry"
 	"aurumflow/pkg/models"
 )
@@ -83,6 +85,14 @@ type Loop struct {
 	// BotTag: directory name of bot config (e.g. "eth-offensive-alpha"); empty if config is in config/ or root
 	BotTag           string
 	BotTagNormalized string
+	Forensic         *stratrade.Recorder
+	Week             *stratrade.WeekState
+	ObserveIntel     func() stratrade.IntelligenceContext
+	GitCommit        string
+	StrategyVersion  string
+	LastScanAt       time.Time
+	LastSignalAt     time.Time
+	LastSignalID     string
 }
 
 // NewLoop creates the event loop with wired dependencies.
@@ -180,12 +190,14 @@ func (l *Loop) tick(ctx context.Context) {
 			cacheValid := l.lastKnownMarketStatus != "" && time.Since(l.lastKnownMarketStatusAt) <= marketStatusCacheTTL
 			if cacheValid {
 				if l.lastKnownMarketStatus != "TRADEABLE" {
+					l.lastDecision = "waiting:MARKET_CLOSED"
 					if l.lastIdleLog.IsZero() || time.Since(l.lastIdleLog) >= idleLogInterval {
 						l.logIdleLine("MARKET_CLOSED", now)
 					}
 					return
 				}
 			} else {
+				l.lastDecision = "waiting:MARKET_CLOSED"
 				if l.lastIdleLog.IsZero() || time.Since(l.lastIdleLog) >= idleLogInterval {
 					l.logIdleLine("MARKET_CLOSED", now)
 				}
@@ -197,6 +209,7 @@ func (l *Loop) tick(ctx context.Context) {
 				l.lastKnownMarketStatusAt = now
 			}
 			if details != nil && details.Snapshot.MarketStatus != "" && details.Snapshot.MarketStatus != "TRADEABLE" {
+				l.lastDecision = "waiting:MARKET_CLOSED"
 				l.reopenWarmupCandlesRemaining = l.Config.DataQuality.ReopenWarmupM15Candles
 				if l.lastIdleLog.IsZero() || time.Since(l.lastIdleLog) >= idleLogInterval {
 					l.logIdleLine("MARKET_CLOSED", now)
@@ -208,11 +221,13 @@ func (l *Loop) tick(ctx context.Context) {
 
 	// Check trading session filter
 	if !strategy.CanTrade(now, l.Config.Strategy.TradingSessions) {
+		l.lastDecision = "waiting:OFF_HOURS"
 		if l.lastIdleLog.IsZero() || time.Since(l.lastIdleLog) >= idleLogInterval {
 			l.logIdleLine("OFF_HOURS", now)
 		}
 		return
 	}
+	l.LastScanAt = now
 	logger.Info("scanning for signals... [state=%s tick=%d session=%s]", currentState, l.tickCount, strategy.GetSessionInfo(now))
 
 	if time.Since(l.lastPing) > l.PingEvery {
@@ -266,6 +281,12 @@ func (l *Loop) tick(ctx context.Context) {
 				len(pos.Positions), openCount, l.Epic, len(pos.Positions)-openCount)
 		}
 
+		if openCount > 0 && l.State.State() == StateInTrade {
+			l.sampleStrategyHeartbeat(now, positions)
+		}
+		if l.State.State() == StateInTrade && openCount > 1 {
+			l.haltForensic("unknown extra GOLD position")
+		}
 		// Transition IN_TRADE -> COOLDOWN when all positions closed
 		if l.State.State() == StateInTrade && openCount == 0 {
 			minutesInTrade := 0
@@ -304,6 +325,7 @@ func (l *Loop) tick(ctx context.Context) {
 					},
 				})
 			}
+			l.finalizeStrategyTrade("UNKNOWN", 0, 0, 0)
 			l.State.ToCooldown()
 			logger.Success("all positions closed, state -> COOLDOWN")
 			telemetry.PublishPositionsBestEffort(l.Telemetry, ctx, l.InstanceID, l.Risk.GetOpenCount(), l.Config.Risk.MaxTrades, l.lastOpenedDealRef)
@@ -773,6 +795,10 @@ func (l *Loop) tick(ctx context.Context) {
 			LiquidityEvent:   liquidityEvent,
 		})
 	}
+	if signal != nil {
+		l.LastSignalAt = now
+		l.LastSignalID = stratrade.SignalID(l.Epic, now, signal.Direction)
+	}
 	if l.OnLegacySignal != nil && signal != nil {
 		l.OnLegacySignal(signal, now)
 	}
@@ -1016,10 +1042,28 @@ func (l *Loop) tick(ctx context.Context) {
 		return
 	}
 
+	if l.Week != nil && l.Week.BlocksNewStrategy() {
+		l.lastDecision = "rejected:MAX_STRATEGY_TRADES"
+		logger.Warn("skip order: strategy maxTrades=%d already completed=%d", l.Week.Snapshot().MaxTrades, l.Week.Snapshot().CompletedStrategyTrades)
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: "MAX_STRATEGY_TRADES", Direction: signal.Direction, Score: signal.Score})
+		return
+	}
+	if l.Week != nil && l.Week.HasOpen() {
+		if l.Forensic != nil {
+			l.Forensic.NoteDuplicateOpen()
+		}
+		l.lastDecision = "rejected:DUPLICATE_OPEN"
+		logger.Warn("skip order: duplicate_open_attempts strategy trade already open")
+		l.journalLife(journal.Lifecycle{Event: journal.EventOrderSkipped, Reason: "DUPLICATE_OPEN", Direction: signal.Direction, Score: signal.Score})
+		return
+	}
+
 	valid, err := l.Risk.ValidateSignal(signal)
 	if err != nil || !valid {
 		reasonCode := notifications.ReasonToCode(journal.RejectRiskReject)
 		l.lastDecision = "rejected:" + reasonCode
+		l.emitForensic(stratrade.EvRiskEvaluated, "FLAT", string(l.State.State()), "risk evaluated")
+		l.emitForensic(stratrade.EvRiskRejected, "FLAT", string(l.State.State()), errString(err))
 		logger.Warn("loop: risk reject: %v", err)
 		if l.Journal != nil {
 			_ = l.Journal.WriteSignalRejected(journal.SignalRejected{
@@ -1104,10 +1148,15 @@ func (l *Loop) tick(ctx context.Context) {
 		return
 	}
 
+	l.captureStrategySnapshot(now, session, signal, size, stopDist, spread)
+	l.emitForensic(stratrade.EvSignalObserved, l.lastKnownMarketStatus, string(l.State.State()), "legacy signal")
+	l.emitForensic(stratrade.EvRiskEvaluated, l.lastKnownMarketStatus, string(l.State.State()), "risk evaluated")
+	l.emitForensic(stratrade.EvRiskAccepted, l.lastKnownMarketStatus, string(l.State.State()), "risk accepted")
 	l.journalLife(journal.Lifecycle{
 		Event: journal.EventOrderIntent, Direction: signal.Direction, Size: size,
 		Entry: signal.Entry, SL: signal.StopLoss, TP: signal.TakeProfit, Score: signal.Score,
 	})
+	l.emitForensic(stratrade.EvOrderIntent, l.lastKnownMarketStatus, string(l.State.State()), "")
 	if execMode == config.ExecutionDryRun {
 		l.lastDecision = "dry_run"
 		logger.Info("DRY_RUN would_have_sent epic=%s direction=%s size=%.4f entry=%.2f sl=%.2f tp=%.2f score=%d state=%s",
@@ -1151,6 +1200,7 @@ func (l *Loop) tick(ctx context.Context) {
 	if prov == nil {
 		prov = l.Exec
 	}
+	l.emitForensic(stratrade.EvBrokerOpenRequest, l.lastKnownMarketStatus, string(l.State.State()), "open request")
 	openRes, err := prov.OpenPosition(ctx, execution.OpenRequest{
 		Epic: l.Epic, Direction: signal.Direction, Size: size,
 		StopLoss: signal.StopLoss, TakeProfit: signal.TakeProfit, Signal: signal,
@@ -1197,6 +1247,12 @@ func (l *Loop) tick(ctx context.Context) {
 	l.lastOpenedDealRef = dealRef
 	l.lastOpenedSignal = signal
 	l.lastOpenedAt = now
+	if l.Forensic != nil {
+		l.Forensic.Bind(l.LastSignalID, dealRef, "")
+	}
+	if l.Week != nil && l.Forensic != nil {
+		_ = l.Week.MarkOpen(l.Forensic.ID(), l.LastSignalID)
+	}
 	execution.LogTrade(signal, size, dealRef, nil)
 
 	// Refresh positions count to get accurate "X of Y" (filtered by epic)
@@ -1238,6 +1294,10 @@ func (l *Loop) tick(ctx context.Context) {
 
 	confirm, err := l.Exec.ConfirmDeal(ctx, dealRef)
 	if err == nil && confirm != nil {
+		if l.Forensic != nil {
+			l.Forensic.Bind(l.LastSignalID, confirm.DealReference, confirm.DealID)
+		}
+		l.emitForensic(stratrade.EvBrokerConfirm, confirm.Status, string(l.State.State()), "confirm")
 		l.journalLife(journal.Lifecycle{
 			Event: journal.EventOrderConfirmed, DealRef: confirm.DealReference, DealID: confirm.DealID,
 			Direction: confirm.Direction, Size: size, ConfirmedSize: confirm.Size, FillPrice: confirm.Level,
@@ -1250,6 +1310,8 @@ func (l *Loop) tick(ctx context.Context) {
 		if confirm.DealID != "" {
 			l.lastOpenedDealRef = confirm.DealID
 		}
+		l.emitForensic(stratrade.EvPositionResolved, confirm.Status, string(l.State.State()), confirm.DealID)
+		l.reconcileOpenedPosition(ctx, signal, size, confirm)
 	}
 	if err != nil {
 		logger.Warn("loop: confirm deal: %v", err)
@@ -1458,4 +1520,199 @@ func atrBucket(atr float64) string {
 	default:
 		return "18+"
 	}
+}
+
+func (l *Loop) DecisionText() string { return l.lastDecision }
+
+func (l *Loop) OpenedAt() time.Time { return l.lastOpenedAt }
+
+func (l *Loop) OpenedSignal() *models.TradeSignal { return l.lastOpenedSignal }
+
+func (l *Loop) SessionView(broker string) stratrade.SessionReport {
+	allowed := []string{}
+	if l.Config != nil {
+		allowed = l.Config.Strategy.TradingSessions
+	}
+	return stratrade.ObserveSession(time.Now().UTC(), allowed, broker)
+}
+
+func (l *Loop) emitForensic(ev, broker, local, note string) {
+	if l.Forensic == nil {
+		return
+	}
+	_ = l.Forensic.Append(stratrade.Event{Event: ev, BrokerState: broker, LocalState: local, Note: note})
+}
+
+func (l *Loop) haltForensic(reason string) {
+	logger.Error("CRITICAL %s — HALT_NEW_ORDERS", reason)
+	if l.Forensic != nil {
+		l.Forensic.Halt(reason)
+		_ = l.Forensic.Append(stratrade.Event{Event: stratrade.EvPositionReconciled, Severity: "CRITICAL", Note: reason})
+	}
+	if l.Kill != nil {
+		_ = l.Kill.HaltPersist()
+	}
+}
+
+func (l *Loop) captureStrategySnapshot(now time.Time, session string, signal *models.TradeSignal, size, stopDist, spread float64) {
+	if signal == nil {
+		return
+	}
+	sigID := l.LastSignalID
+	if sigID == "" {
+		sigID = stratrade.SignalID(l.Epic, now, signal.Direction)
+		l.LastSignalID = sigID
+	}
+	id := stratrade.TradeID(sigID, "", "", l.Epic)
+	if l.Forensic == nil {
+		l.Forensic = stratrade.NewRecorder(filepath.Join("research", "strategy-trades"), id)
+	} else {
+		l.Forensic.Bind(sigID, "", "")
+	}
+	mpu := l.Money.MoneyPerPriceUnit
+	mid := signal.Entry
+	ask := mid
+	bid := mid
+	if spread > 0 {
+		ask = mid + spread/2
+		bid = mid - spread/2
+	}
+	journalState := "MISSING"
+	if l.Journal != nil {
+		journalState = "OK"
+	}
+	ver := l.StrategyVersion
+	if ver == "" {
+		ver = "LEGACY"
+	}
+	snap := stratrade.FreezePreSignal(stratrade.PreSignalSnapshot{
+		SignalID: sigID, StrategyTradeID: id, Timestamp: now, GitCommit: l.GitCommit,
+		StrategyVersion: ver, Instrument: l.Epic, Direction: signal.Direction,
+		Bid: bid, Ask: ask, Mid: mid, Spread: spread, MarketStatus: l.lastKnownMarketStatus,
+		H1State: "", H4State: "", LegacyScore: signal.Score, ATR: 0, RSI: 0, Session: session,
+		EntryCandidate: signal.Entry, StopLoss: signal.StopLoss, TakeProfit: signal.TakeProfit,
+		StopDistance: stopDist, PositionSize: size, MoneyPerPriceUnit: mpu,
+		ExpectedAccountRisk: stratrade.ExpectedRiskUSD(size, stopDist, mpu),
+		AccountBalance: l.Risk.GetBalance(), DailyDrawdown: l.Risk.DailyDrawdownPct(),
+		OpenPositionsBefore: l.Risk.GetOpenCount(),
+		KillSwitch: l.Kill != nil && l.Kill.HaltNewOrders(),
+		BrokerConnection: "CONNECTED", JournalState: journalState,
+	})
+	_ = l.Forensic.PersistPreSignal(snap)
+	if l.ObserveIntel != nil {
+		_ = l.Forensic.AttachIntel(l.ObserveIntel())
+	}
+}
+
+func (l *Loop) sampleStrategyHeartbeat(now time.Time, positions []market.PositionItem) {
+	if l.Forensic == nil || l.lastOpenedSignal == nil {
+		return
+	}
+	var p market.PositionItem
+	if len(positions) > 0 {
+		p = positions[0]
+	}
+	brokerUPL := p.Position.Upnl
+	if brokerUPL == 0 {
+		brokerUPL = p.Position.ProfitLoss
+	}
+	closeable := p.Position.Level
+	if closeable == 0 {
+		closeable = l.lastOpenedSignal.Entry
+	}
+	exp := stratrade.ExpectedUPL(l.lastOpenedSignal.Direction, p.Position.Size, p.Position.Level, closeable, l.Money.MoneyPerPriceUnit)
+	_ = l.Forensic.Sample(stratrade.Heartbeat{
+		Timestamp: now, BrokerUPL: brokerUPL, ExpectedUPL: exp,
+		SL: l.lastOpenedSignal.StopLoss, TP: l.lastOpenedSignal.TakeProfit,
+		PositionState: string(l.State.State()),
+	})
+	l.emitForensic(stratrade.EvMonitoring, l.lastKnownMarketStatus, string(l.State.State()), "heartbeat")
+}
+
+func (l *Loop) reconcileOpenedPosition(ctx context.Context, signal *models.TradeSignal, size float64, confirm *execution.ConfirmResponse) {
+	if confirm == nil {
+		return
+	}
+	l.emitForensic(stratrade.EvPositionReconciled, confirm.Status, string(l.State.State()), "identity resolved")
+	brokerSL, brokerTP := 0.0, 0.0
+	brokerDir, brokerEpic := confirm.Direction, confirm.Epic
+	brokerSize := confirm.Size
+	if confirm.DealID != "" && l.Client != nil {
+		if item, err := l.Client.GetPosition(ctx, confirm.DealID); err == nil && item != nil {
+			brokerSL = item.Position.StopLevel
+			brokerTP = item.Position.ProfitLevel
+			if item.Position.Direction != "" {
+				brokerDir = item.Position.Direction
+			}
+			if item.GetEpic() != "" {
+				brokerEpic = item.GetEpic()
+			}
+			if item.Position.Size > 0 {
+				brokerSize = item.Position.Size
+			}
+		}
+	}
+	dirOK := strings.EqualFold(brokerDir, signal.Direction)
+	epicOK := brokerEpic == "" || strings.EqualFold(brokerEpic, l.Epic)
+	sizeOK := brokerSize == 0 || math.Abs(brokerSize-size) <= math.Max(0.0001, size*0.01)
+	protKnown := brokerSL != 0 || brokerTP != 0
+	protOK := !protKnown || stratrade.ProtectiveOK(signal.StopLoss, signal.TakeProfit, brokerSL, brokerTP, 0.05)
+	if !dirOK || !epicOK || !sizeOK || !protOK {
+		l.haltForensic("protective/identity mismatch vs broker")
+		return
+	}
+	note := "protective levels verified"
+	if !protKnown {
+		note = "protective levels requested; broker did not expose stop/profit"
+	}
+	l.emitForensic(stratrade.EvProtectiveVerified, confirm.Status, string(l.State.State()), note)
+}
+
+func (l *Loop) finalizeStrategyTrade(exitReason string, brokerPnL float64, localCount, brokerCount int) {
+	reason := stratrade.ExitReasonFromEvidence(exitReason)
+	l.emitForensic(stratrade.EvExitCondition, "FLAT", string(l.State.State()), reason)
+	l.emitForensic(stratrade.EvBrokerCloseRequest, "FLAT", string(l.State.State()), "broker close observed")
+	l.emitForensic(stratrade.EvBrokerCloseConfirm, "FLAT", string(l.State.State()), "close confirmation inferred")
+	l.emitForensic(stratrade.EvPositionClosed, "FLAT", "COOLDOWN", reason)
+	dup := 0
+	if l.Forensic != nil {
+		dup = l.Forensic.DuplicateOpens()
+	}
+	mismatch := !stratrade.CountsAgree(localCount, brokerCount)
+	if mismatch {
+		l.haltForensic("final broker/local mismatch")
+	}
+	ops := stratrade.OperationalOutcome(mismatch, dup > 0, false, false)
+	if l.Forensic != nil {
+		halted, _ := l.Forensic.Halted()
+		if halted {
+			ops = stratrade.OpsFailed
+		}
+	}
+	l.emitForensic(stratrade.EvFinalReconciliation, "FLAT", "COOLDOWN", ops)
+	if l.Forensic != nil {
+		halted, _ := l.Forensic.Halted()
+		_ = l.Forensic.Finish(stratrade.FinalRecord{
+			Direction:          "",
+			GrossBrokerPnL:     brokerPnL,
+			ExitReason:         reason,
+			TradeOutcome:       stratrade.TradeOutcome(brokerPnL, 0.01),
+			OperationalOutcome: ops,
+			LocalPositions:     localCount,
+			BrokerPositions:    brokerCount,
+			CountsAgree:        !mismatch,
+			ProtectiveOK:       !halted,
+		})
+		_ = stratrade.WriteReport(l.Forensic.Dir())
+	}
+	if l.Week != nil && l.Forensic != nil {
+		_ = l.Week.MarkClosed(l.Forensic.ID())
+	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
