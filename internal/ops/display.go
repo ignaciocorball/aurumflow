@@ -100,5 +100,5 @@ func DecisionWhy(st Status) string {
 			lines = append(lines, "Microprice is resisting higher prices.")
 		}
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(WhyLines(strings.Join(lines, "\n"), 5), "\n")
 }

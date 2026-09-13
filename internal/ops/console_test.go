@@ -43,11 +43,11 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	html := string(body)
-	if !strings.Contains(html, "LIVE IMPOSSIBLE") || !strings.Contains(html, "SHADOW") {
+	if !strings.Contains(html, "LIVE IMPOSSIBLE") || !strings.Contains(html, "LIVE LOCKED") || !strings.Contains(html, "SHADOW") {
 		t.Fatal("safety bar")
 	}
-	if !strings.Contains(html, "Global capital surface") {
-		t.Fatal("global tab")
+	if !strings.Contains(html, "GLOBAL INTELLIGENCE") || !strings.Contains(html, "OVERVIEW") {
+		t.Fatal("product shell")
 	}
 	if !strings.Contains(html, "Official sources") || !strings.Contains(html, "CONTEXT CALENDAR") {
 		t.Fatal("official panels")
@@ -56,7 +56,16 @@ func TestConsoleSafetyAndReadOnly(t *testing.T) {
 		t.Fatal("live tape panels")
 	}
 	if !strings.Contains(html, "SESSION STRIP") || !strings.Contains(html, "TOKYO") || !strings.Contains(html, "CORRELATION ≠ CAUSATION") {
-		t.Fatal("p82 ui")
+		t.Fatal("session/correlation")
+	}
+	if !strings.Contains(html, "data-view=\"overview\"") || !strings.Contains(html, "data-view=\"research\"") {
+		t.Fatal("navigation")
+	}
+	if !strings.Contains(html, "connectSSE") || !strings.Contains(html, "MAX=3600") {
+		t.Fatal("sse reconnect / bounded series")
+	}
+	if !strings.Contains(html, "NOT VALIDATION THRESHOLDS") || !strings.Contains(html, "ATTENTION") {
+		t.Fatal("research / attention")
 	}
 	if !strings.Contains(html, "$300 DEMO") || !strings.Contains(html, "account_currency_risk") {
 		t.Fatal("risk units")

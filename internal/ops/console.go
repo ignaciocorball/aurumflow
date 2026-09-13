@@ -5,130 +5,253 @@ const consoleHTML = `<!doctype html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AURUMFLOW Observatory</title>
+<title>AURUMFLOW · Global Intelligence</title>
 <style>
 :root{
-  --bg:#0c1016;--panel:#131922;--ink:#d8dee8;--dim:#8a93a3;--line:#243044;
-  --ok:#3ecf8e;--warn:#e4c15a;--bad:#e36a6a;--long:#5aa7d4;--short:#c9846a;
-  --ask:#8d4a4a;--bid:#2f6b52;--guide:#3a4456;
+  --bg:#090c11;
+  --glass-bg:rgba(16,22,32,.62);
+  --glass-border:rgba(220,230,245,.08);
+  --glass-highlight:rgba(255,255,255,.07);
+  --glass-shadow:0 10px 40px rgba(0,0,0,.35);
+  --surface-solid:#10161f;
+  --surface-elevated:#161d28;
+  --text-primary:#e8edf5;
+  --text-secondary:#9aa6b8;
+  --text-tertiary:#6d7889;
+  --ok:#5fbf96; --warn:#d4b15a; --bad:#c97a76; --long:#6aa8d4; --short:#c98a72;
+  --ask:#7a4545; --bid:#2f5d4a; --guide:#2c3646;
+  --up:#5fbf96; --down:#c98a72; --mix:#d4b15a; --unk:#6d7889;
+  --s4:4px; --s8:8px; --s12:12px; --s16:16px; --s24:24px; --s32:32px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-  font:12px/1.4 ui-sans-serif,system-ui,Segoe UI,sans-serif}
+html,body{margin:0;height:100%;background:
+  radial-gradient(1200px 600px at 12% -10%, rgba(40,70,110,.18), transparent 50%),
+  radial-gradient(900px 500px at 90% 0%, rgba(40,90,80,.10), transparent 46%),
+  var(--bg);
+  color:var(--text-primary);
+  font:13px/1.45 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums}
 body{display:flex;flex-direction:column;min-height:100vh}
-#top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
-  padding:7px 12px;border-bottom:1px solid var(--line);background:#0e141c;position:sticky;top:0;z-index:5}
-#top strong{letter-spacing:.12em;font-size:12px}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--dim)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--unk)}
 .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
-.chip{color:var(--dim);white-space:nowrap}
-.chip b{color:var(--ink);font-weight:600}
-.chip.bad b{color:var(--bad)}.chip.ok b{color:var(--ok)}.chip.warn b{color:var(--warn)}
-#nav{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:#0e141c}
-#nav button{border:1px solid var(--line);background:transparent;color:var(--dim);padding:3px 10px;font:11px inherit;cursor:pointer;letter-spacing:.08em}
-#nav button.on{color:var(--ink);border-color:#4a5a72}
-.pane{display:none;flex:1;min-height:0}
-.pane.on{display:block}
-#work.pane.on{display:grid}
-#global{padding:8px;overflow:auto}
-.map{display:flex;align-items:center;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
-.map .reg{border:1px solid var(--line);padding:8px 12px;min-width:120px}
-.map .reg b{display:block}
-.heat td{padding:3px 8px;border:1px solid var(--line)}
-.pos{color:var(--ok)}.neg{color:var(--bad)}.mix{color:var(--warn)}.unk{color:var(--dim)}
-#work{flex:1;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);
-  grid-template-rows:auto auto auto 1fr;gap:8px;padding:8px;min-height:0}
-.box{background:var(--panel);border:1px solid var(--line);padding:8px 10px;min-width:0}
-.box h2{margin:0 0 6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
-.tabs{display:flex;gap:6px;margin-bottom:6px}
-.tab,.vp{border:1px solid var(--line);background:transparent;color:var(--dim);padding:2px 8px;font:11px inherit;cursor:pointer}
-.tab.on,.vp.on{color:var(--ink);border-color:#4a5a72}
-canvas{width:100%;display:block;background:#0d1219}
-.row2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.kv{display:grid;grid-template-columns:1fr auto;gap:2px 10px;color:var(--dim)}
-.kv b{color:var(--ink);font-weight:600}
-.rail{display:flex;flex-direction:column;gap:8px;grid-row:1 / span 4}
-.cls{font-size:20px;letter-spacing:.04em;margin:2px 0 8px;font-weight:650}
-.cls.long{color:var(--long)}.cls.short{color:var(--short)}.cls.none{color:var(--dim)}
-.why{white-space:pre-wrap;color:var(--ink);min-height:4.5em;border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
-#tl{height:92px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--dim)}
-#tl div{padding:1px 0;border-bottom:1px solid #1b2430}
-#foot{display:flex;flex-wrap:wrap;gap:12px;padding:5px 12px;border-top:1px solid var(--line);
-  background:#0e141c;color:var(--dim);font-size:11px}
-#foot b{color:var(--ink);font-weight:600}
-.depth-wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:8px}
-.meter{height:8px;background:#1a2230;position:relative;margin:3px 0 8px}
-.meter>i{position:absolute;top:0;bottom:0;background:#3d5a46}
-.meter.mid>i{left:50%;width:2px;background:var(--guide)}
-.sym{display:flex;height:10px;background:#1a2230;margin:3px 0 8px}
-.sym .l{background:#2f6b52}.sym .r{background:#8d4a4a}
-.note{color:var(--dim);font-size:11px;margin-top:4px}
-.warnbox{border-color:#5a4a20;color:var(--warn)}
-#gclosed{line-height:1.6}
-#gpos{font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre}
+#cmd{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;
+  padding:8px 16px;position:sticky;top:0;z-index:8;
+  background:var(--glass-bg);backdrop-filter:blur(18px) saturate(1.2);
+  border-bottom:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow), inset 0 1px 0 var(--glass-highlight)}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand strong{letter-spacing:.16em;font-size:13px}
+.brand .sub{color:var(--text-secondary);font-size:11px;letter-spacing:.14em}
+.sys{color:var(--text-tertiary);font-size:10px;letter-spacing:.08em}
+#sessbar{display:flex;gap:16px;font-size:11px;letter-spacing:.1em;color:var(--text-secondary)}
+#sessbar b{color:var(--text-primary);font-weight:600;margin-left:6px}
+.saf{display:flex;justify-content:flex-end;align-items:center;gap:12px;font-size:11px;color:var(--text-secondary)}
+.pill{padding:2px 8px;border-radius:999px;border:1px solid var(--glass-border);letter-spacing:.08em}
+.pill.ok{color:var(--ok)}.pill.bad{color:var(--bad)}
+#app{flex:1;min-height:0;display:grid;grid-template-columns:88px minmax(0,1fr) 220px}
+#rail{display:flex;flex-direction:column;gap:4px;padding:12px 8px;
+  background:rgba(10,14,20,.45);border-right:1px solid var(--glass-border)}
+#rail button{border:0;background:transparent;color:var(--text-tertiary);padding:8px 6px;
+  font:10px inherit;letter-spacing:.1em;cursor:pointer;text-align:left;border-radius:8px}
+#rail button.on{color:var(--text-primary);background:rgba(255,255,255,.04)}
+#rail #dens{margin-top:auto;color:var(--text-tertiary)}
+#stage{min-width:0;min-height:0;overflow:auto;padding:12px}
+.view{display:none}
+.view.on{display:block;height:100%}
+#view-overview.on{display:grid}
+.ov{height:100%;min-height:calc(100vh - 92px);display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1fr auto;gap:12px}
+.hero{grid-column:1/9;grid-row:1/3}
+.opp{grid-column:9/13;grid-row:1/3}
+.sessrot{grid-column:1/5}
+.mstate{grid-column:5/9}
+.dec{grid-column:9/13}
+.glass{background:var(--glass-bg);backdrop-filter:blur(16px);
+  border:1px solid var(--glass-border);border-radius:14px;
+  box-shadow:inset 0 1px 0 var(--glass-highlight);padding:12px 14px;min-width:0}
+.solid{background:var(--surface-solid);border:1px solid var(--glass-border);border-radius:12px;padding:12px}
+h2{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-secondary);font-weight:600}
+.note{color:var(--text-tertiary);font-size:11px;margin-top:4px}
+.pos{color:var(--up)}.neg{color:var(--down)}.mix{color:var(--mix)}.unk{color:var(--unk)}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.tile{background:var(--surface-solid);border:1px solid var(--glass-border);border-radius:10px;padding:8px;cursor:pointer;min-width:0}
+.tile b{display:block;font-size:11px;letter-spacing:.08em}
+.tile .px{font-size:16px;font-weight:650;margin:2px 0}
+.tile .meta{color:var(--text-tertiary);font-size:10px}
+.tile.closed{opacity:.72}
+.tile.live{box-shadow:inset 0 0 0 1px rgba(95,191,150,.25)}
+.tile.openflash{animation:illum .24s ease}
+@keyframes illum{from{box-shadow:0 0 0 0 rgba(95,191,150,.5)}to{box-shadow:none}}
+.bar{height:4px;background:#1b2430;border-radius:99px;overflow:hidden;margin:3px 0}
+.bar>i{display:block;height:100%;background:rgba(106,168,212,.75)}
+.orow{display:grid;grid-template-columns:18px 1fr;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer}
+.orow b{font-size:13px}
+.strip{display:flex;gap:12px;flex-wrap:wrap}
+.chipk{color:var(--text-tertiary);font-size:10px;letter-spacing:.08em}
+.chipk b{display:block;color:var(--text-primary);font-size:13px;font-weight:650}
+.sessline{position:relative;height:28px;margin:8px 0 4px;background:#10161f;border-radius:99px;overflow:hidden}
+.sessline span{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.08em;color:var(--text-tertiary)}
+.sessline .now{position:absolute;top:0;bottom:0;width:2px;background:var(--text-primary);opacity:.7}
+#events{padding:10px 10px 8px;border-left:1px solid var(--glass-border);background:rgba(10,14,20,.4);overflow:auto}
+#events h2{margin-bottom:6px}
+#tl div{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;color:var(--text-secondary)}
+#tl .sev-warn{color:var(--warn)}#tl .sev-crit{color:var(--bad)}#tl .sev-state{color:var(--long)}
+#foot{display:flex;flex-wrap:wrap;gap:12px;padding:6px 14px;
+  border-top:1px solid var(--glass-border);background:rgba(10,14,20,.7);
+  color:var(--text-tertiary);font-size:11px}
+#foot b{color:var(--text-primary);font-weight:600}
+.hq{display:flex;gap:10px;margin-right:auto}
+.hq span{letter-spacing:.06em}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 12px;color:var(--text-secondary);font-size:12px}
+.kv b{color:var(--text-primary);font-weight:600}
+.hero-px{font-size:32px;font-weight:650;letter-spacing:-.02em;margin:2px 0}
+.hero-nm{font-size:22px;letter-spacing:.08em}
+.cls{font-size:20px;font-weight:650;margin:4px 0 8px}
+.cls.long{color:var(--long)}.cls.short{color:var(--short)}.cls.none{color:var(--text-tertiary)}
+.why{white-space:pre-wrap;color:var(--text-primary);min-height:3.2em;margin-top:6px;font-size:12px}
+canvas{width:100%;display:block;background:var(--surface-solid);border-radius:8px}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab,.vp{border:1px solid var(--glass-border);background:transparent;color:var(--text-secondary);
+  padding:3px 10px;font:11px inherit;cursor:pointer;border-radius:99px}
+.tab.on,.vp.on{color:var(--text-primary);background:rgba(255,255,255,.05)}
+table.heat{width:100%;border-collapse:collapse;font-size:12px}
+.heat td,.heat th{padding:5px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text-secondary)}
+.heat th{font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.axis{display:grid;grid-template-columns:72px 1fr 1fr;gap:6px;align-items:center;font-size:11px;color:var(--text-secondary);margin:4px 0}
+.axis .pair{display:flex;height:8px;background:#1a2230;border-radius:99px;overflow:hidden}
+.axis .l{background:var(--bid)}.axis .r{background:var(--ask)}
+.meter{height:8px;background:#1a2230;position:relative;margin:3px 0 8px;border-radius:99px}
+.meter>i{position:absolute;top:0;bottom:0;background:var(--long);width:8px;border-radius:99px}
+.gates span{display:flex;justify-content:space-between;padding:3px 0;color:var(--text-secondary);font-size:12px}
+.gates b{color:var(--text-primary)}
+#pal{display:none;position:fixed;inset:18% 30%;z-index:20;background:var(--glass-bg);
+  backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:14px;padding:12px;box-shadow:var(--glass-shadow)}
+#pal.on{display:block}
+#pal input{width:100%;background:#0d1219;border:1px solid var(--glass-border);color:var(--text-primary);padding:8px;border-radius:8px}
+#pal button{display:block;width:100%;text-align:left;margin-top:6px;background:transparent;border:0;color:var(--text-secondary);padding:6px;cursor:pointer}
+body.dense .glass,body.dense .solid,body.dense .tile{padding:8px}
+body.dense .ov{gap:8px}
+@media (max-width:1366px){
+  #app{grid-template-columns:72px 1fr 180px}
+  .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .hero{grid-column:1/13;grid-row:auto}
+  .opp{grid-column:1/13}
+}
 @media (max-width:1100px){
-  #work{grid-template-columns:1fr;grid-template-rows:auto}
-  .rail{grid-row:auto}
-  .row2{grid-template-columns:1fr}
+  #app{grid-template-columns:1fr}
+  #rail{flex-direction:row;overflow:auto}
+  #events{display:none}
 }
 </style>
 </head>
 <body>
-<header id="top">
-  <strong>AURUMFLOW</strong>
-  <span class="chip ok"><i class="dot ok"></i><b>CAPITAL DEMO</b></span>
-  <span class="chip bad"><i class="dot bad"></i><b>LIVE IMPOSSIBLE / FAIL-CLOSED</b></span>
-  <span class="chip" id="goldm"><i class="dot warn"></i><b>GOLD WAITING</b></span>
-  <span class="chip" id="btcfeed"><i class="dot"></i><b>BTC —</b></span>
-  <span class="chip" id="booksync"><i class="dot"></i><b>BOOK —</b></span>
-  <span class="chip" id="exec"><i class="dot"></i><b>EXEC SHADOW</b></span>
-  <span class="chip" id="kill"><i class="dot"></i><b>KILL OFF</b></span>
-  <span class="chip" id="pos"><i class="dot"></i><b>POS —</b></span>
-  <span class="chip warn"><i class="dot warn"></i><b>SHADOW</b></span>
-  <span class="chip" id="clk" style="margin-left:auto"></span>
+<header id="cmd">
+  <div class="brand">
+    <strong>AURUMFLOW</strong>
+    <span class="sub">GLOBAL INTELLIGENCE</span>
+    <span class="sys"><i class="dot ok"></i>SYSTEM ONLINE</span>
+  </div>
+  <div id="sessbar">
+    <span>ASIA<b id="cmd-asia">—</b></span>
+    <span>EUROPE<b id="cmd-eu">—</b></span>
+    <span>US<b id="cmd-us">—</b></span>
+  </div>
+  <div class="saf">
+    <span class="pill ok">DEMO</span>
+    <span class="pill bad" title="LIVE IMPOSSIBLE / FAIL-CLOSED">LIVE LOCKED</span>
+    <span id="booksync"><i class="dot"></i>BOOK —</span>
+    <span id="kill"><i class="dot"></i>KILL OFF</span>
+    <span id="clk"></span>
+  </div>
 </header>
-<nav id="nav">
-  <button type="button" class="on" data-pane="global">GLOBAL</button>
-  <button type="button" data-pane="work">MARKETS</button>
-  <button type="button" data-pane="work">MICRO</button>
-  <button type="button" data-pane="work">EXECUTION</button>
-  <button type="button" data-pane="work">RESEARCH</button>
+<div id="app">
+<nav id="rail" aria-label="Primary">
+  <button type="button" class="on" data-view="overview">OVERVIEW</button>
+  <button type="button" data-view="world">WORLD</button>
+  <button type="button" data-view="markets">MARKETS</button>
+  <button type="button" data-view="micro">MICRO</button>
+  <button type="button" data-view="execution">EXECUTION</button>
+  <button type="button" data-view="research">RESEARCH</button>
+  <button type="button" id="dens">COMFORTABLE</button>
 </nav>
-<div id="global" class="pane on">
-  <section class="box">
-    <h2>Global capital surface</h2>
-    <div class="note">BTC is a 24/7 microstructure lab, not the primary global asset. Attention is not a trade.</div>
-    <div class="map" id="cmap">
-      <div class="reg"><span class="dot"></span><b>ASIA</b><span id="m-asia">WAITING</span></div>
-      <span>→</span>
-      <div class="reg"><span class="dot"></span><b>EUROPE</b><span id="m-eu">WAITING</span></div>
-      <span>→</span>
-      <div class="reg"><span class="dot"></span><b>UNITED STATES</b><span id="m-us">WAITING</span></div>
-    </div>
-    <div class="kv" id="gkv"></div>
-    <div class="note" id="truth">Official origin: WAITING</div>
-    <div class="note">Official context · Live price · History readiness · Micro readiness are separate. No single confidence.</div>
-    <div class="kv" id="dqkv"></div>
+<main id="stage">
+<section id="view-overview" class="view on">
+  <div class="ov">
+    <section class="glass hero">
+      <h2>What is the world doing?</h2>
+      <div class="note">SESSION STRIP</div>
+      <div class="sessline" id="sessline" aria-label="World session timeline"></div>
+      <div class="note" id="sslead">TOKYO · HONG KONG · LONDON · NEW YORK</div>
+      <div class="strip" id="wstrip" style="margin:10px 0"></div>
+      <div class="tiles" id="constel"></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="solid">
+          <h2>Capital flow evidence</h2>
+          <div class="note">Official slow context. Not price. CAPITAL FLOW EVIDENCE.</div>
+          <div class="kv" id="flowev"></div>
+        </div>
+        <div class="solid">
+          <h2>PRICE LEADERSHIP</h2>
+          <div class="note">Relative strength · CORRELATION ≠ CAUSATION</div>
+          <div class="kv" id="rotkv"></div>
+        </div>
+      </div>
+    </section>
+    <aside class="glass opp">
+      <h2>Where should I look?</h2>
+      <div class="note">ATTENTION — not a recommendation</div>
+      <div id="oppbox"></div>
+      <div class="why" id="odetail">Select a market for why.</div>
+    </aside>
+    <section class="glass sessrot">
+      <h2>Session / rotation</h2>
+      <div class="kv" id="sesskv"></div>
+    </section>
+    <section class="glass mstate">
+      <h2>Market state</h2>
+      <div class="hero-nm" id="mhero-nm">GOLD</div>
+      <div class="hero-px" id="mhero-px">—</div>
+      <div class="note" id="mhero-st">MARKET CLOSED</div>
+      <div class="kv" id="mherokv"></div>
+    </section>
+    <section class="glass dec">
+      <h2>What AurumFlow sees · is it allowed to act?</h2>
+      <div class="cls none" id="v1big">NO SETUP</div>
+      <div class="kv">
+        <span>Legacy</span><b id="leg">—</b>
+        <span>Flow</span><b id="v1">NEUTRAL</b>
+        <span>Absorption</span><b id="abs">UNAVAILABLE</b>
+        <span>Data quality</span><b id="dqnow">—</b>
+      </div>
+      <div class="why" id="why">WAITING</div>
+    </section>
+  </div>
+</section>
+<section id="view-world" class="view">
+  <div class="grid2">
+    <section class="glass"><h2>World state</h2><div class="kv" id="gkv"></div><div class="note" id="truth">Official origin: WAITING</div></section>
+    <section class="glass"><h2>Region cards</h2><div class="kv" id="rkv"></div></section>
+  </div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Asset-class heatmap</h2>
+    <table class="heat" id="heat"><thead><tr><th></th><th>Momentum</th><th>Capital flow</th><th>Positioning</th><th>Macro</th><th>Risk</th><th>Opportunity</th></tr></thead><tbody></tbody></table>
   </section>
-  <section class="box">
-    <h2>SESSION STRIP · 24h</h2>
-    <div class="note">Clock-descriptive. Broker marketStatus remains authoritative.</div>
-    <div class="map" id="sstrip">
-      <div class="reg"><span class="dot"></span><b>TOKYO</b><span id="ss-tyo">—</span></div>
-      <div class="reg"><span class="dot"></span><b>HONG KONG</b><span id="ss-hk">—</span></div>
-      <div class="reg"><span class="dot"></span><b>LONDON</b><span id="ss-lon">—</span></div>
-      <div class="reg"><span class="dot"></span><b>NEW YORK</b><span id="ss-ny">—</span></div>
-    </div>
-    <div class="note" id="sslead">Regional leadership: WAITING</div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Official sources</h2>
+    <div class="note">Source health · Official sources · CONTEXT CALENDAR</div>
+    <table class="heat" id="srctab"><thead><tr><th>Source</th><th>Latest published</th><th>Latest observation</th><th>Retrieved</th><th>Freshness</th><th>Origin</th><th>Status</th></tr></thead><tbody></tbody></table>
+    <div class="kv" id="calkv"></div>
+    <div class="kv" id="instkv"></div>
   </section>
-  <section class="box">
+</section>
+<section id="view-markets" class="view">
+  <section class="glass">
     <h2>WORLD MARKET TAPE</h2>
-    <div class="note">LIVE · CLOSED · STALE · WARMING. CLOSED / STALE quotes are not current momentum.</div>
-    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Tape</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>H</th><th>M</th><th>V</th><th>X</th><th>L</th><th>μ</th><th>Attention</th><th>Coverage</th><th>Tier</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
+    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Tape</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>Attention</th><th>Coverage</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
   </section>
-  <section class="box">
-    <h2>MARKET COMPARISON</h2>
-    <div class="note">Normalized price paths. CORRELATION ≠ CAUSATION.</div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Comparison</h2>
     <div class="tabs">
       <button type="button" class="tab on" data-cmp="GOLD,SILVER">GOLD vs SILVER</button>
       <button type="button" class="tab" data-cmp="US100,US500">US100 vs US500</button>
@@ -136,124 +259,75 @@ canvas{width:100%;display:block;background:#0d1219}
       <button type="button" class="tab" data-cmp="J225,CN50">J225 vs CN50</button>
     </div>
     <div class="kv" id="cmpkv"></div>
+    <div class="note">Normalized paths. CORRELATION ≠ CAUSATION.</div>
   </section>
-  <section class="box">
-    <h2>PORTFOLIO RISK</h2>
-    <div class="note">Limits use account_currency_risk. Unknown monetary risk → BLOCK.</div>
-    <div class="kv" id="riskkv"></div>
-  </section>
-  <section class="box">
-    <h2>GLOBAL HEATMAP</h2>
-    <div class="note">ASIA · EUROPE · US · COMMODITIES · CRYPTO. UNKNOWN stays gray.</div>
-    <div class="map" id="hmap">
-      <div class="reg" id="hm-asia"><span class="dot"></span><b>ASIA</b><span id="hv-asia">UNKNOWN</span></div>
-      <div class="reg" id="hm-eu"><span class="dot"></span><b>EUROPE</b><span id="hv-eu">UNKNOWN</span></div>
-      <div class="reg" id="hm-us"><span class="dot"></span><b>US</b><span id="hv-us">UNKNOWN</span></div>
-      <div class="reg" id="hm-com"><span class="dot"></span><b>COMMODITIES</b><span id="hv-com">UNKNOWN</span></div>
-      <div class="reg" id="hm-cry"><span class="dot"></span><b>CRYPTO</b><span id="hv-cry">UNKNOWN</span></div>
-    </div>
-  </section>
-  <section class="box">
-    <h2>GLOBAL ROTATION</h2>
-    <div class="note">PRICE LEADERSHIP — not capital flow. Do not infer flows from price alone.</div>
-    <div class="kv" id="rotkv"></div>
-  </section>
-  <section class="box">
-    <h2>CAPITAL FLOW EVIDENCE</h2>
-    <div class="note">Official slow context only. Separate from PRICE LEADERSHIP.</div>
-    <div id="flowev" class="kv"></div>
-  </section>
-  <section class="box">
-    <h2>Official sources</h2>
-    <div class="note">LIVE OFFICIAL · CACHED OFFICIAL · UNKNOWN. Fixtures never appear here.</div>
-    <table class="heat" id="srctab"><thead><tr><th>Source</th><th>Latest published</th><th>Latest observation</th><th>Retrieved</th><th>Freshness</th><th>Origin</th><th>Status</th></tr></thead><tbody></tbody></table>
-  </section>
-  <section class="box">
-    <h2>CONTEXT CALENDAR</h2>
-    <div class="note">Release awareness only. Not news trading.</div>
-    <div class="kv" id="calkv"></div>
-  </section>
-  <section class="box">
-    <h2>Region cards</h2>
-    <div class="kv" id="rkv"></div>
-  </section>
-  <section class="box">
-    <h2>Asset-class heatmap</h2>
-    <table class="heat" id="heat"><thead><tr><th></th><th>Momentum</th><th>Capital Flow</th><th>Positioning</th><th>Macro</th><th>Risk</th><th>Opportunity</th></tr></thead><tbody></tbody></table>
-  </section>
-  <section class="box">
-    <h2>Global opportunity radar</h2>
-    <div class="note">ATTENTION_SCORE_V1 — where to look, not what to buy.</div>
-    <table class="heat" id="oradar"><thead><tr><th>Rank</th><th>Market</th><th>Attention</th><th>Coverage</th><th>Legacy</th><th>Macro</th><th>Flow</th><th>Positioning</th><th>Micro</th><th>Eligibility</th><th>Proposal</th></tr></thead><tbody></tbody></table>
-    <div id="odetail" class="why">Select a market for evidence.</div>
-  </section>
-  <section class="box">
-    <h2>Capital flow</h2>
-    <div class="note">CAPITAL FLOW EVIDENCE (official) vs PRICE LEADERSHIP (live tape) stay separate.</div>
-    <div id="flows" class="kv"></div>
-  </section>
-  <section class="box">
-    <h2>Global timeline · Tokyo → Hong Kong → London → New York</h2>
-    <div id="gtl" class="note">WAITING</div>
-  </section>
-  <section class="box">
-    <h2>Institutional inspector</h2>
-    <div class="note">DELAYED — 13F is not live order direction.</div>
-    <div class="kv" id="instkv"></div>
-  </section>
-</div>
-<div id="work" class="pane">
-  <section class="box" id="chartbox">
-    <h2>Market</h2>
+</section>
+<section id="view-micro" class="view">
+  <section class="glass" id="chartbox">
+    <h2>BTC microstructure</h2>
     <div class="tabs">
-      <button type="button" class="tab on" id="tab-btc">BTC INTELLIGENCE</button>
-      <button type="button" class="tab" id="tab-gold">GOLD EXECUTION</button>
+      <button type="button" class="tab on" id="tab-btc">BTC</button>
+      <button type="button" class="tab" id="tab-gold">GOLD DEMO</button>
       <span style="flex:1"></span>
       <button type="button" class="vp on" data-m="15">15m</button>
       <button type="button" class="vp" data-m="30">30m</button>
       <button type="button" class="vp" data-m="60">1h</button>
     </div>
-    <canvas id="mkt" height="220"></canvas>
+    <canvas id="mkt" height="220" aria-label="Price chart"></canvas>
     <div class="note" id="mktnote">price + microprice · markers are runtime-observed only</div>
+    <div class="kv" id="mpkv"></div>
   </section>
-  <aside class="rail">
-    <section class="box">
-      <h2>What AurumFlow sees now</h2>
-      <div class="kv"><span>Legacy</span><b id="leg">NONE</b></div>
-      <div class="cls none" id="v1big">NEUTRAL</div>
-      <div class="kv">
-        <span>V1</span><b id="v1">NEUTRAL</b>
-        <span>Absorption</span><b id="abs">UNAVAILABLE</b>
-      </div>
-      <div class="why" id="why">WAITING</div>
+  <div class="grid3" style="margin-top:12px">
+    <section class="solid"><h2>Pressure</h2><canvas id="prs" height="110"></canvas><div class="note">guides +15 / 0 / −15 frozen V1</div></section>
+    <section class="solid"><h2>CVD</h2><canvas id="cvd" height="110"></canvas><div class="kv" id="cvdkv"></div></section>
+    <section class="solid"><h2>Flow magnitude vs price efficiency</h2><canvas id="eff" height="110"></canvas><div class="note">IMPACT FAILURE as derived state</div></section>
+  </div>
+  <div class="grid2" style="margin-top:12px">
+    <section class="glass"><h2>L2 book</h2><canvas id="book" height="240"></canvas><div class="kv" id="l2kv"></div></section>
+    <section class="glass">
+      <h2>Liquidity response</h2>
+      <div id="liq"></div>
+      <div class="note">Imbalance 1 / 5 / 10 / 20</div>
+      <div id="imbs"></div>
+      <h2 style="margin-top:12px">FLOW EXHAUSTION V1</h2>
+      <div class="kv" id="exhkv"></div>
+      <h2 style="margin-top:12px">Absorption</h2>
+      <div class="kv" id="abskv"></div>
     </section>
-    <section class="box" id="qbox">
-      <h2>Data quality</h2>
-      <div class="kv" id="qkv"></div>
-    </section>
-    <section class="box" id="gbox">
-      <h2>GOLD execution · DEMO</h2>
+  </div>
+</section>
+<section id="view-execution" class="view">
+  <div class="grid2">
+    <section class="glass">
+      <h2>GOLD execution · DEMO · SHADOW</h2>
       <div id="gclosed">
-        <div>GOLD</div>
-        <div><b>CLOSED</b></div>
+        <div class="hero-nm">GOLD</div>
+        <div class="hero-px">CLOSED</div>
         <div>Awaiting broker TRADEABLE status</div>
-        <div>Monetary validation: <b>BROKER_METADATA_ONLY</b></div>
-        <div>Execution: <b>NOT STARTED</b></div>
-        <div>Next gate: <b>RUNTIME CALIBRATION</b></div>
+        <div class="note">NEXT · Runtime monetary calibration</div>
       </div>
       <div id="gopen" hidden>
-        <div class="kv" id="gkv"></div>
-        <div id="gpos"></div>
+        <div class="kv" id="gexec"></div>
+        <div id="gpos" class="note"></div>
       </div>
     </section>
-    <section class="box">
-      <h2>Prospective collection</h2>
-      <div class="kv" id="pros"></div>
-      <div class="note">Milestones 25 / 50 / 100 / 200 are collection counts, not validation.</div>
-      <canvas id="mile" height="36"></canvas>
+    <section class="glass">
+      <h2>Eligibility / operational trust</h2>
+      <div class="gates" id="gates"></div>
+      <div class="note">Intelligence plane is separate from execution safety plane.</div>
     </section>
-    <section class="box">
-      <h2>Research · event study, not account return</h2>
+  </div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Portfolio risk</h2>
+    <div class="note">account_currency_risk · Aggregate risk cap: $300 DEMO</div>
+    <div class="kv" id="riskkv"></div>
+    <div id="riskbars"></div>
+  </section>
+</section>
+<section id="view-research" class="view">
+  <div class="grid2">
+    <section class="glass">
+      <h2>FLOW EXHAUSTION V1</h2>
       <div class="kv">
         <span>Spec</span><b>FLOW_EXHAUSTION_V1</b>
         <span>Discovery</span><b>n=56</b>
@@ -265,61 +339,61 @@ canvas{width:100%;display:block;background:#0d1219}
         <span>Execution</span><b>DISABLED</b>
       </div>
     </section>
-  </aside>
-  <section class="box">
-    <h2>Pressure · CVD · flow efficiency</h2>
-    <div class="row2">
-      <div>
-        <canvas id="prs" height="110"></canvas>
-        <div class="note">guides +15 / 0 / −15 = frozen V1 |DirectionalPressure| threshold, not overbought/oversold</div>
-      </div>
-      <div>
-        <canvas id="cvd" height="110"></canvas>
-        <div class="kv" id="cvdkv"></div>
-      </div>
-      <div>
-        <canvas id="eff" height="110"></canvas>
-        <div class="note">aggression vs deteriorating efficiency</div>
-      </div>
-    </div>
+    <section class="glass">
+      <h2>Prospective collection</h2>
+      <div class="note">NOT VALIDATION THRESHOLDS</div>
+      <div class="kv" id="pros"></div>
+      <canvas id="mile" height="36"></canvas>
+    </section>
+  </div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Opportunity research · ATTENTION_SCORE_V1</h2>
+    <div class="note">Prospective 15m · 1h · 4h · 1d. Do not tune.</div>
+    <div class="kv" id="oppresearch"></div>
+    <div class="note">L2 quality binds l2_proxy_quality. DEGRADED is amber, not failure.</div>
+    <div class="kv" id="qkv"></div>
   </section>
-  <section class="box">
-    <h2>L2 book</h2>
-    <div class="depth-wrap">
-      <canvas id="book" height="200"></canvas>
-      <div>
-        <div class="kv" id="l2kv"></div>
-        <div class="note">Imbalance 1 / 5 / 10 / 20</div>
-        <div id="imbs"></div>
-        <div class="note">Liquidity response · bid left / ask right</div>
-        <div id="liq"></div>
-      </div>
-    </div>
-  </section>
-  <section class="box" style="grid-column:1">
-    <h2>Event timeline</h2>
-    <div id="tl"></div>
-  </section>
+</section>
+</main>
+<aside id="events">
+  <h2>Activity</h2>
+  <div id="tl"></div>
+</aside>
 </div>
 <footer id="foot">
-  <span>events/s <b id="f-rate">—</b></span>
+  <div class="hq">
+    <span>TRADES <b id="h-tr">—</b></span>
+    <span>BOOK <b id="h-bk">—</b></span>
+    <span>L2 <b id="h-l2">—</b></span>
+    <span>WORLD <b id="h-wd">—</b></span>
+    <span>CAPITAL <b id="h-cp">PREOPEN</b></span>
+  </div>
+  <span>ev/s <b id="f-rate">—</b></span>
   <span>trades <b id="f-tr">—</b></span>
-  <span>depth deltas <b id="f-dlt">—</b></span>
+  <span>deltas <b id="f-dlt">—</b></span>
   <span>drops <b id="f-drop">—</b></span>
   <span>gaps <b id="f-gap">—</b></span>
   <span>resyncs <b id="f-rs">—</b></span>
-  <span>p50 <b id="f-p50">—</b></span>
   <span>p95 <b id="f-p95">—</b></span>
   <span>mem <b id="f-mem">—</b></span>
-  <span>disk <b id="f-disk">—</b></span>
-  <span>last event <b id="f-ev">—</b></span>
+  <span>last <b id="f-ev">—</b></span>
 </footer>
+<div id="pal">
+  <input id="palq" placeholder="Open GOLD · Open BTC Micro · Show sources"/>
+  <button type="button" data-go="overview">Overview</button>
+  <button type="button" data-go="world">Show sources</button>
+  <button type="button" data-go="markets" data-mkt="GOLD">Open GOLD</button>
+  <button type="button" data-go="markets" data-mkt="US100">Open US100</button>
+  <button type="button" data-go="micro">Open BTC Micro</button>
+</div>
 <script>
-var MAX=3600, series=[], events=[], viewport=15, tab='btc', lastDraw=0, lastS=null, prevGold='';
+var MAX=3600, series=[], events=[], viewport=15, tab='btc', lastDraw=0, lastS=null, prevGold='', lastWorld=null, selMkt='GOLD', cmpPair=['GOLD','SILVER'];
 function el(id){return document.getElementById(id)}
 function miss(){return '—'}
 function isNum(v){return typeof v==='number' && isFinite(v)}
-function num(ok,v,n){if(!ok||!isNum(v)) return miss(); if(n==null) n=2; return v.toFixed(n)}
+function num(ok,v,n){if(!ok||!isNum(v)||(v===0&&n!=null&&idZero(v))) return miss(); if(!ok||!isNum(v)) return miss(); if(n==null) n=2; return group(v.toFixed(n))}
+function idZero(v){return v===0}
+function group(s){var n=String(s),p=n.split('.'),h=p[0],o='',i; for(i=0;i<h.length;i++){if(i&&(h.length-i)%3===0)o+=',';o+=h[i]} return p[1]!=null?o+'.'+p[1]:o}
 function txt(v){if(v===undefined||v===null||v==='') return miss(); return String(v)}
 function goldMS(s){return String((s&&s.market_status)||'').toUpperCase()}
 function goldOpen(s){return goldMS(s)==='TRADEABLE'}
@@ -336,14 +410,18 @@ function v1rail(c){
   if(c.indexOf('CONTINUATION')>=0) return 'CONTINUATION';
   return 'NEUTRAL';
 }
+function tone(v){
+  v=String(v||'').toUpperCase();
+  if(v==='HEALTHY'||v==='SYNCED'||v==='OK'||v==='LIVE') return 'ok';
+  if(v==='DEGRADED'||v==='PARTIAL'||v==='STALE'||v==='PREOPEN') return 'warn';
+  if(v==='FAILED'||v==='UNSYNCED'||v==='UNUSABLE') return 'bad';
+  return '';
+}
 function pushPt(s){
   var t=Date.now();
   if(s.last_update){var p=Date.parse(s.last_update); if(isFinite(p)) t=p}
-  series.push({
-    t:t, price:s.btc_price||0, micro:s.microprice||0, gold:s.gold_quotes_ok?s.gold_bid:0,
-    pr:s.pressure||0, dp:s.directional_pressure||0, cvd:s.cvd||0,
-    fe:s.flow_efficiency||0, imp:s.impact_failure||0
-  });
+  series.push({t:t, price:s.btc_price||0, micro:s.microprice||0, gold:s.gold_quotes_ok?s.gold_bid:0,
+    pr:s.pressure||0, dp:s.directional_pressure||0, cvd:s.cvd||0, fe:s.flow_efficiency||0, imp:s.impact_failure||0});
   if(series.length>MAX) series=series.slice(series.length-MAX);
 }
 function fit(c){
@@ -359,14 +437,14 @@ function winSeries(){
 }
 function plot(id, pts, keys, cols, guides, ymin, ymax){
   var c=el(id); if(!c) return;
-  var g=fit(c), d=g.d, w=g.w, h=g.h, pad=16;
+  var g=fit(c), d=g.d, w=g.w, h=g.h, pad=18;
   d.clearRect(0,0,w,h);
-  if(!pts.length){d.fillStyle='#8a93a3'; d.fillText('WAITING',10,20); return}
+  if(!pts.length){d.fillStyle='#6d7889'; d.fillText('WAITING',10,20); return}
   var i,j,mn=ymin, mx=ymax;
   if(mn==null||mx==null){
     mn=Infinity; mx=-Infinity;
     for(i=0;i<pts.length;i++) for(j=0;j<keys.length;j++){
-      var v=pts[i][keys[j]]; if(isNum(v)){if(v<mn)mn=v; if(v>mx)mx=v}
+      var v=pts[i][keys[j]]; if(isNum(v)&&v!==0){if(v<mn)mn=v; if(v>mx)mx=v}
     }
     if(!isFinite(mn)){mn=-1; mx=1}
     if(mn===mx){mn-=1; mx+=1}
@@ -375,74 +453,81 @@ function plot(id, pts, keys, cols, guides, ymin, ymax){
   var t0=pts[0].t, t1=pts[pts.length-1].t; if(t1<=t0) t1=t0+1;
   function X(t){return pad+(t-t0)/(t1-t0)*(w-pad*2)}
   function Y(v){return h-pad-(v-mn)/(mx-mn)*(h-pad*2)}
-  d.strokeStyle='#243044'; d.beginPath(); d.moveTo(pad,Y(0)); d.lineTo(w-pad,Y(0)); d.stroke();
   if(guides){
-    d.setLineDash([3,4]); d.strokeStyle='#3a4456';
+    d.fillStyle='rgba(212,177,90,.06)';
+    d.fillRect(pad, Y(Math.max(mx,40)), w-pad*2, Y(15)-Y(Math.max(mx,40)));
+    d.fillRect(pad, Y(-15), w-pad*2, Y(Math.min(mn,-40))-Y(-15));
+    d.setLineDash([3,4]); d.strokeStyle='#2c3646';
     for(i=0;i<guides.length;i++){d.beginPath(); d.moveTo(pad,Y(guides[i])); d.lineTo(w-pad,Y(guides[i])); d.stroke()}
     d.setLineDash([]);
-    d.fillStyle='#8a93a3';
+    d.fillStyle='#6d7889';
     for(i=0;i<guides.length;i++) d.fillText(String(guides[i]), 4, Y(guides[i])+3);
+  } else {
+    d.strokeStyle='#1b2430'; d.beginPath(); d.moveTo(pad,h-pad); d.lineTo(w-pad,h-pad); d.stroke();
   }
   for(j=0;j<keys.length;j++){
-    d.strokeStyle=cols[j]||'#6ea8fe'; d.beginPath();
+    d.strokeStyle=cols[j]||'#6ea8fe'; d.lineWidth=1.4; d.beginPath();
     var started=false;
     for(i=0;i<pts.length;i++){
-      var v=pts[i][keys[j]]; if(!isNum(v)) continue;
+      var v=pts[i][keys[j]]; if(!isNum(v)||v===0&&keys[j]==='gold') continue;
       if(!started){d.moveTo(X(pts[i].t),Y(v)); started=true} else d.lineTo(X(pts[i].t),Y(v));
     }
-    d.stroke();
+    d.stroke(); d.lineWidth=1;
   }
   if(id==='mkt'){
+    var last=pts[pts.length-1], pk=keys[0], lastv=last[pk];
+    if(isNum(lastv)&&lastv!==0){
+      d.fillStyle='#e8edf5'; d.fillText(group(lastv.toFixed(1)), w-64, Y(lastv)-4);
+    }
     for(i=0;i<events.length;i++){
-      var ev=events[i];
-      var x=X(ev.t);
+      var ev=events[i], x=X(ev.t);
       if(x<pad||x>w-pad) continue;
       d.fillStyle=markCol(ev.kind);
-      d.fillRect(x, pad, 1, h-pad*2);
+      d.beginPath(); d.moveTo(x,8); d.lineTo(x-3,14); d.lineTo(x+3,14); d.fill();
     }
   }
 }
 function markCol(k){
-  if(k==='legacy') return '#5aa7d4';
-  if(k==='v1') return '#e4c15a';
-  if(k==='absorption') return '#3ecf8e';
-  return '#8a93a3';
+  if(k==='legacy') return '#6aa8d4';
+  if(k==='v1') return '#d4b15a';
+  if(k==='absorption') return '#5fbf96';
+  return '#6d7889';
 }
 function drawBook(s){
   var c=el('book'), g=fit(c), d=g.d, w=g.w, h=g.h;
   d.clearRect(0,0,w,h);
-  if(!s.book_synced){d.fillStyle='#e4c15a'; d.fillText('BOOK UNSYNCED',10,20); return}
+  if(!s.book_synced){d.fillStyle='#d4b15a'; d.fillText('BOOK UNSYNCED',10,20); return}
   var bids=s.top_bids||[], asks=s.top_asks||[];
   var maxq=0,i;
   for(i=0;i<bids.length;i++) if(bids[i].qty>maxq) maxq=bids[i].qty;
   for(i=0;i<asks.length;i++) if(asks[i].qty>maxq) maxq=asks[i].qty;
-  if(maxq<=0){d.fillStyle='#8a93a3'; d.fillText('WAITING',10,20); return}
+  if(maxq<=0){d.fillStyle='#6d7889'; d.fillText('WAITING',10,20); return}
   var rows=Math.max(asks.length,1)+1+Math.max(bids.length,1);
-  var rh=Math.max(8,(h-8)/rows), y=4, mid=s.l2_mid;
+  var rh=Math.max(10,(h-10)/rows), y=6, mid=s.l2_mid;
   function bar(side, lv, y0){
-    var bw=(lv.qty/maxq)*(w-90);
+    var bw=(lv.qty/maxq)*(w-100);
     d.fillStyle=side==='a'?'#5a3030':'#1f4a38';
-    d.fillRect(80,y0,bw,rh-1);
-    d.fillStyle='#d8dee8';
-    d.fillText((lv.price||0).toFixed(2)+'  '+num(true,lv.qty,3), 4, y0+rh-2);
+    if(side==='a') d.fillRect(w-bw-8,y0,bw,rh-2); else d.fillRect(8,y0,bw,rh-2);
+    d.fillStyle='#e8edf5';
+    d.fillText((lv.price||0).toFixed(2), side==='a'?8:w-86, y0+rh-3);
   }
   for(i=asks.length-1;i>=0;i--){bar('a',asks[i],y); y+=rh}
-  d.fillStyle='#8a93a3'; d.fillText('mid '+num(l2ok(s),mid,2), 4, y+rh-2); y+=rh;
+  d.fillStyle='#9aa6b8'; d.fillText('MID '+num(l2ok(s),mid,2), 8, y+rh-3); y+=rh;
   for(i=0;i<bids.length;i++){bar('b',bids[i],y); y+=rh}
 }
 function meterHTML(v){
   var x=50+Math.max(-1,Math.min(1,v||0))*50;
-  return '<div class="meter"><i style="left:'+x+'%;width:8px;background:#5aa7d4"></i></div>';
+  return '<div class="meter"><i style="left:'+x+'%"></i></div>';
 }
 function liqHTML(s){
   function pair(a,b){
-    var t=Math.abs(a)+Math.abs(b); if(t<=0) return '<div class="sym"><span class="l" style="width:50%"></span><span class="r" style="width:50%"></span></div>';
+    var t=Math.abs(a)+Math.abs(b); if(t<=0) return '<div class="pair"><span class="l" style="width:50%"></span><span class="r" style="width:50%"></span></div>';
     var lp=100*Math.abs(a)/t;
-    return '<div class="sym"><span class="l" style="width:'+lp+'%"></span><span class="r" style="width:'+(100-lp)+'%"></span></div>';
+    return '<div class="pair"><span class="l" style="width:'+lp+'%"></span><span class="r" style="width:'+(100-lp)+'%"></span></div>';
   }
-  return 'Replenish'+pair(s.bid_replenishment,s.ask_replenishment)+
-    'Deplete'+pair(s.bid_depletion,s.ask_depletion)+
-    'Persist'+pair(s.bid_persistence,s.ask_persistence);
+  return '<div class="axis"><span>REFILL</span>'+pair(s.bid_replenishment,s.ask_replenishment)+'</div>'+
+    '<div class="axis"><span>DEPLETE</span>'+pair(s.bid_depletion,s.ask_depletion)+'</div>'+
+    '<div class="axis"><span>PERSIST</span>'+pair(s.bid_persistence,s.ask_persistence)+'</div>';
 }
 function kv(id, rows){
   var e=el(id); if(!e) return;
@@ -450,45 +535,33 @@ function kv(id, rows){
 }
 function clock(){
   var d=new Date();
-  el('clk').textContent=d.toISOString().slice(11,19)+' UTC   '+d.toLocaleTimeString();
-}
-function setChip(id, cls, label){
-  var e=el(id); e.className='chip '+cls;
-  e.innerHTML='<i class="dot '+cls+'"></i><b>'+label+'</b>';
+  el('clk').textContent=d.toISOString().slice(11,19)+' UTC';
 }
 function paint(s){
   lastS=s;
   var ms=goldMS(s);
-  if(ms==='TRADEABLE') setChip('goldm','ok','GOLD TRADEABLE');
-  else if(ms==='CLOSED') setChip('goldm','warn','GOLD CLOSED');
-  else setChip('goldm','warn','GOLD WAITING');
+  if(ms && ms!==prevGold && prevGold && (ms==='TRADEABLE'||prevGold==='TRADEABLE')){
+    var t=document.querySelector('[data-sym="GOLD"]');
+    if(t){ t.classList.add('openflash'); setTimeout(function(){t.classList.remove('openflash')},240); }
+    events.push({t:Date.now(), kind:'state', text:'GOLD MARKET OPEN', sev:'state'});
+  }
   prevGold=ms;
-  setChip('btcfeed', s.btc_price>0?'ok':'warn', s.btc_price>0?('BTC '+num(true,s.btc_price,1)):'BTC WAITING');
-  setChip('booksync', s.book_synced?'ok':'bad', s.book_synced?'BOOK SYNC':'BOOK UNSYNCED');
-  setChip('exec','warn','EXEC '+(s.execution_mode||'SHADOW'));
-  setChip('kill', s.kill_switch?'bad':'ok', s.kill_switch?'KILL ON':'KILL OFF');
-  setChip('pos', s.positions_known?'ok':'warn', s.positions_known?('POS '+s.open_positions):'POS —');
-  var lg=legacy(s); el('leg').textContent=lg;
+  el('booksync').innerHTML='<i class="dot '+(s.book_synced?'ok':'bad')+'"></i>'+(s.book_synced?'BOOK SYNC':'BOOK UNSYNCED');
+  el('kill').innerHTML='<i class="dot '+(s.kill_switch?'bad':'ok')+'"></i>'+(s.kill_switch?'KILL ON':'KILL OFF');
+  var lg=legacy(s); el('leg').textContent=lg==='NONE'?'—':lg;
   var v=v1rail(s.last_v1_classification);
-  el('v1').textContent=v; el('v1big').textContent=v;
+  el('v1').textContent=v;
+  el('v1big').textContent=lg==='NONE'&&v==='NEUTRAL'?'NO SETUP':v;
   el('v1big').className='cls '+(lg==='LONG'?'long':lg==='SHORT'?'short':'none');
   el('abs').textContent=txt(s.absorption_status)==='—'?'UNAVAILABLE':s.absorption_status;
-  el('why').textContent=s.decision_why||'WAITING';
-  var q=s.l2_proxy_quality||'WAITING';
-  var qcls=q==='DEGRADED'||q==='UNUSABLE'||!s.book_synced;
-  el('qbox').className=qcls?'box warnbox':'box';
-  kv('qkv',[
-    ['Binance trades', s.event_freshness?'HEALTHY':'WAITING'],
-    ['Book', s.book_synced?'SYNCED':'UNSYNCED'],
-    ['L2 quality', txt(s.l2_proxy_quality)],
-    ['Book age', s.book_age_ms==null?miss():(s.book_age_ms+' ms')],
-    ['Latency p95', num(isNum(s.latency_p95_ms)&&s.latency_p95_ms>0,s.latency_p95_ms,1)+' ms']
-  ]);
+  var why=(s.decision_why||'WAITING').split('\n').filter(Boolean).slice(0,5).join('\n');
+  el('why').textContent=why;
+  el('dqnow').textContent=s.l2_proxy_quality||'WAITING';
   var closed=!goldOpen(s);
   el('gclosed').hidden=!closed;
   el('gopen').hidden=closed;
   if(!closed){
-    kv('gkv',[
+    kv('gexec',[
       ['Market', 'TRADEABLE'],
       ['Bid', num(s.gold_quotes_ok,s.gold_bid,2)],
       ['Ask', num(s.gold_quotes_ok,s.gold_ask,2)],
@@ -499,27 +572,16 @@ function paint(s){
       ['Entry', s.position_open?num(true,s.gold_entry,2):miss()],
       ['SL', s.position_open?num(true,s.gold_sl,2):miss()],
       ['TP', s.position_open?num(true,s.gold_tp,2):miss()],
-      ['uPnL', s.position_open?num(true,s.gold_upnl,2):miss()],
-      ['Daily PnL', s.position_open||s.positions_known?num(isNum(s.daily_pnl),s.daily_pnl,2):miss()],
-      ['Daily DD', s.positions_known?num(isNum(s.daily_dd_pct),s.daily_dd_pct,2):miss()],
-      ['Trades today', s.positions_known?String(s.trades_today||0):miss()]
+      ['uPnL', s.position_open?num(true,s.gold_upnl,2):miss()]
     ]);
     el('gpos').textContent=posVis(s);
   } else {
-    var val=s.gold_validation||'BROKER_METADATA_ONLY';
-    el('gclosed').innerHTML='<div>GOLD</div><div><b>'+(ms||'CLOSED')+'</b></div>'+
-      '<div>Awaiting broker TRADEABLE status</div>'+
-      '<div>Monetary validation: <b>'+val+'</b></div>'+
-      '<div>Execution: <b>NOT STARTED</b></div>'+
-      '<div>Next gate: <b>RUNTIME CALIBRATION</b></div>';
+    el('gclosed').innerHTML='<div class="hero-nm">GOLD</div><div class="hero-px">'+(ms||'CLOSED')+'</div>'+
+      '<div>Awaiting broker TRADEABLE status</div><div class="note">NEXT · Runtime monetary calibration</div>';
   }
   kv('cvdkv',[
-    ['CVD', num(isNum(s.cvd),s.cvd,2)],
-    ['Agg long', num(isNum(s.aggressive_buy_flow),s.aggressive_buy_flow,3)],
-    ['Agg short', num(isNum(s.aggressive_sell_flow),s.aggressive_sell_flow,3)],
-    ['Vel 1s', num(isNum(s.flow_velocity_1s),s.flow_velocity_1s,2)],
-    ['Vel 5s', num(isNum(s.flow_velocity_5s),s.flow_velocity_5s,2)],
-    ['Vel 30s', num(isNum(s.flow_velocity_30s),s.flow_velocity_30s,3)]
+    ['CVD', num(isNum(s.cvd)&&s.cvd!==0,s.cvd,2)],
+    ['Vel 1s', num(isNum(s.flow_velocity_1s)&&s.flow_velocity_1s!==0,s.flow_velocity_1s,2)]
   ]);
   kv('l2kv',[
     ['Spread', num(l2ok(s), s.l2_spread, 3)],
@@ -527,17 +589,30 @@ function paint(s){
     ['Provider', txt(s.l2_provider)],
     ['Age', s.book_age_ms==null?miss():(s.book_age_ms+' ms')]
   ]);
+  kv('mpkv',[
+    ['MID', num(l2ok(s), s.l2_mid, 2)],
+    ['MICRO', num(s.l2_quotes_ok&&isNum(s.microprice), s.microprice, 2)],
+    ['Δ', (s.l2_quotes_ok&&isNum(s.microprice)&&isNum(s.l2_mid))?((s.microprice-s.l2_mid)>=0?'+':'')+ (s.microprice-s.l2_mid).toFixed(2):miss()]
+  ]);
   el('imbs').innerHTML='1'+meterHTML(s.imbalance_1)+'5'+meterHTML(s.imbalance_5)+'10'+meterHTML(s.imbalance_10)+'20'+meterHTML(s.imbalance_20);
   el('liq').innerHTML=liqHTML(s);
+  kv('exhkv',[
+    ['Status', v],
+    ['Directional pressure', num(isNum(s.directional_pressure),s.directional_pressure,1)],
+    ['Note', 'No execution implication']
+  ]);
+  kv('abskv',[
+    ['State', txt(s.absorption_status)],
+    ['Supporting fill', num(isNum(s.supporting_replenishment),s.supporting_replenishment,2)],
+    ['Opposing delete', num(isNum(s.opposing_depletion),s.opposing_depletion,2)],
+    ['Persistence', num(isNum(s.supporting_persistence),s.supporting_persistence,2)]
+  ]);
   var exh=s.prospective_exhaustion||0;
   kv('pros',[
-    ['Legacy', String(s.prospective_signals||0)],
-    ['Exhaustion', String(exh)],
+    ['EXHAUSTION', exh+' / 25 · '+exh+' / 50 · '+exh+' / 100 · '+exh+' / 200'],
     ['Continuation', String(s.prospective_continuation||0)],
-    ['Neutral', String(s.prospective_neutral||0)],
     ['Mature 15m', String(s.mature_15m||0)],
-    ['Mature 1h', String(s.mature_1h||0)],
-    ['Exhaustion with valid L2', String((s.exh_supportive||0)+(s.exh_strongly_supportive||0))]
+    ['Mature 1h', String(s.mature_1h||0)]
   ]);
   drawMile(exh);
   el('f-rate').textContent=num(isNum(s.event_rate)&&s.event_rate>0,s.event_rate,2);
@@ -546,32 +621,42 @@ function paint(s){
   el('f-drop').textContent=String(s.dropped_events||0);
   el('f-gap').textContent=String(s.book_gaps||0);
   el('f-rs').textContent=String(s.resyncs||0);
-  el('f-p50').textContent=num(isNum(s.latency_p50_ms)&&s.latency_p50_ms>0,s.latency_p50_ms,1);
   el('f-p95').textContent=num(isNum(s.latency_p95_ms)&&s.latency_p95_ms>0,s.latency_p95_ms,1);
   el('f-mem').textContent=num(isNum(s.peak_mem_mb)&&s.peak_mem_mb>0,s.peak_mem_mb,1);
-  el('f-disk').textContent=num(isNum(s.collector_disk_mb)&&s.collector_disk_mb>0,s.collector_disk_mb,1);
   el('f-ev').textContent=txt(s.last_event);
+  el('h-tr').textContent=s.event_rate>0?'HEALTHY':'WAITING';
+  el('h-bk').textContent=s.book_synced?'SYNCED':'UNSYNCED';
+  el('h-l2').textContent=s.l2_proxy_quality||'WAITING';
+  el('h-tr').className=tone(el('h-tr').textContent);
+  el('h-bk').className=tone(el('h-bk').textContent);
+  el('h-l2').className=tone(s.l2_proxy_quality);
+  paintGates(s);
+}
+function paintGates(s){
+  var rows=[
+    ['Identity', true],
+    ['Market data', !!s.gold_quotes_ok||goldMS(s)!==''],
+    ['History', false],
+    ['Strategy', false],
+    ['Monetary', false],
+    ['Lifecycle', false],
+    ['Risk', true]
+  ];
+  el('gates').innerHTML=rows.map(function(r){return '<span>'+r[0]+'<b>'+(r[1]?'✓':'○')+'</b></span>'}).join('');
 }
 function posVis(s){
   if(!s.position_open) return '';
   var cur=s.gold_quotes_ok?s.gold_bid:s.gold_entry;
-  function dist(px){
-    if(!isNum(px)||!isNum(cur)||cur===0) return miss();
-    var dpx=px-cur, pct=100*dpx/cur, r=miss();
-    if(isNum(s.gold_entry)&&isNum(s.gold_sl)&&s.gold_entry!==s.gold_sl){
-      r=((px-s.gold_entry)/Math.abs(s.gold_entry-s.gold_sl)).toFixed(2);
-    }
-    return num(true,px,2)+'   '+num(true,pct,2)+'%   R '+r;
-  }
-  return 'ENTRY    '+dist(s.gold_entry)+'\nCURRENT  '+dist(cur)+'\nTP       '+dist(s.gold_tp)+'\nSL       '+dist(s.gold_sl);
+  return 'ENTRY '+num(true,s.gold_entry,2)+'   CURRENT '+num(isNum(cur),cur,2)+'   SL '+num(true,s.gold_sl,2)+'   TP '+num(true,s.gold_tp,2);
 }
 function drawMile(n){
-  var c=el('mile'), g=fit(c), d=g.d, w=g.w, h=g.h, ms=[25,50,100,200], i;
+  var c=el('mile'); if(!c) return;
+  var g=fit(c), d=g.d, w=g.w, h=g.h, ms=[25,50,100,200], i;
   d.clearRect(0,0,w,h);
   d.strokeStyle='#243044'; d.beginPath(); d.moveTo(8,h/2); d.lineTo(w-8,h/2); d.stroke();
   for(i=0;i<ms.length;i++){
     var x=8+(ms[i]/200)*(w-16);
-    d.fillStyle=n>=ms[i]?'#3ecf8e':'#8a93a3';
+    d.fillStyle=n>=ms[i]?'#5fbf96':'#6d7889';
     d.fillRect(x-1,8,2,h-16);
     d.fillText(String(ms[i]), x-8, h-2);
   }
@@ -582,16 +667,23 @@ function drawAll(){
   lastDraw=now;
   var pts=winSeries();
   if(tab==='gold'){
-    plot('mkt', pts, ['gold'], ['#e4c15a'], null, null, null);
-    el('mktnote').textContent=goldOpen(lastS||{})?'GOLD DEMO · price only after TRADEABLE':'GOLD CLOSED · no quote series';
+    plot('mkt', pts, ['gold'], ['#d4b15a'], null, null, null);
+    el('mktnote').textContent=goldOpen(lastS||{})?'GOLD DEMO · price · entry / SL / TP when open':'GOLD CLOSED · no quote series';
   } else {
-    plot('mkt', pts, ['price','micro'], ['#d8dee8','#5aa7d4'], null, null, null);
-    el('mktnote').textContent='BTC price + microprice · runtime markers only';
+    plot('mkt', pts, ['price','micro'], ['#e8edf5','#6aa8d4'], null, null, null);
+    el('mktnote').textContent='BTC price + microprice · glyphs only';
   }
-  plot('prs', pts, ['pr','dp'], ['#d8dee8','#e4c15a'], [15,0,-15], -40, 40);
-  plot('cvd', pts, ['cvd'], ['#5aa7d4'], null, null, null);
-  plot('eff', pts, ['fe','imp'], ['#3ecf8e','#c9846a'], null, null, null);
+  plot('prs', pts, ['pr','dp'], ['#e8edf5','#d4b15a'], [15,0,-15], -40, 40);
+  plot('cvd', pts, ['cvd'], ['#6aa8d4'], null, null, null);
+  plot('eff', pts, ['fe','imp'], ['#5fbf96','#c98a72'], null, null, null);
   if(lastS) drawBook(lastS);
+}
+function sevClass(e){
+  var t=String((e&& (e.sev||e.kind||e.text))||'').toUpperCase();
+  if(t.indexOf('CRIT')>=0||t.indexOf('UNSYNC')>=0) return 'sev-crit';
+  if(t.indexOf('WARN')>=0||t.indexOf('DEGRAD')>=0) return 'sev-warn';
+  if(t.indexOf('STATE')>=0||t.indexOf('OPEN')>=0) return 'sev-state';
+  return '';
 }
 function onEvt(list){
   events=list||[];
@@ -599,7 +691,7 @@ function onEvt(list){
   var box=el('tl'), i, html='';
   for(i=events.length-1;i>=0;i--){
     var e=events[i], t=new Date(e.t).toISOString().slice(11,19);
-    html+='<div>'+t+'  '+e.kind+'  '+e.text+'</div>';
+    html+='<div class="'+sevClass(e)+'">'+t+'  '+(e.text||e.kind)+'</div>';
   }
   box.innerHTML=html||'<div>WAITING</div>';
 }
@@ -620,62 +712,91 @@ fetch('/api/timeseries').then(function(r){return r.json()}).then(function(j){
 }).catch(function(){});
 fetch('/api/events').then(function(r){return r.json()}).then(function(j){onEvt(j.events||[])}).catch(function(){});
 fetch('/api/status').then(function(r){return r.json()}).then(function(s){pushPt(s); paint(s); drawAll()});
-var es=new EventSource('/api/stream');
-es.onmessage=function(ev){
-  try{
-    var s=JSON.parse(ev.data);
-    pushPt(s); paint(s);
-    if(s.last_event){
-      var last=events.length?events[events.length-1].text:'';
-      if(s.last_event!==last){
-        events.push({t:Date.now(), kind:'live', text:s.last_event});
-        if(events.length>200) events=events.slice(events.length-200);
-        onEvt(events);
+var es=null;
+function connectSSE(){
+  if(es) try{es.close()}catch(e){}
+  es=new EventSource('/api/stream');
+  es.onmessage=function(ev){
+    try{
+      var s=JSON.parse(ev.data);
+      pushPt(s); paint(s);
+      if(s.last_event){
+        var last=events.length?events[events.length-1].text:'';
+        if(s.last_event!==last){
+          events.push({t:Date.now(), kind:'live', text:s.last_event});
+          if(events.length>200) events=events.slice(events.length-200);
+          onEvt(events);
+        }
       }
-    }
-  }catch(e){}
-};
-var navs=document.querySelectorAll('#nav button');
-for(var ni=0;ni<navs.length;ni++) (function(b){
-  b.onclick=function(){
-    for(var j=0;j<navs.length;j++) navs[j].className='';
-    b.className='on';
-    var p=b.getAttribute('data-pane');
-    el('global').className=p==='global'?'pane on':'pane';
-    el('work').className=p==='work'?'pane on':'pane';
-    lastDraw=0; drawAll();
+    }catch(e){}
   };
-})(navs[ni]);
+  es.onerror=function(){ setTimeout(connectSSE, 2000); };
+}
+connectSSE();
+function showView(name){
+  var vs=document.querySelectorAll('.view'), bs=document.querySelectorAll('#rail [data-view]'), i;
+  for(i=0;i<vs.length;i++) vs[i].className='view'+(vs[i].id==='view-'+name?' on':'');
+  for(i=0;i<bs.length;i++) bs[i].className=bs[i].getAttribute('data-view')===name?'on':'';
+  lastDraw=0; drawAll();
+}
+var navs=document.querySelectorAll('#rail [data-view]');
+for(var ni=0;ni<navs.length;ni++) (function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; })(navs[ni]);
+el('dens').onclick=function(){
+  var d=document.body.classList.toggle('dense');
+  el('dens').textContent=d?'DENSE':'COMFORTABLE';
+};
+document.addEventListener('keydown', function(e){
+  if(e.target && e.target.id==='palq') return;
+  var map={'1':'overview','2':'world','3':'markets','4':'micro','5':'execution','6':'research'};
+  if(map[e.key]) showView(map[e.key]);
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){ e.preventDefault(); el('pal').classList.toggle('on'); el('palq').focus(); }
+});
+var pbs=document.querySelectorAll('#pal [data-go]');
+for(var pi=0;pi<pbs.length;pi++) (function(b){
+  b.onclick=function(){
+    showView(b.getAttribute('data-go'));
+    if(b.getAttribute('data-mkt')) selectMarket(b.getAttribute('data-mkt'));
+    el('pal').classList.remove('on');
+  };
+})(pbs[pi]);
 function cell(v){
   v=String(v||'unknown').toLowerCase();
   var cls='unk';
-  if(v==='inflow'||v==='up'||v==='expanding'||v==='risk_on') cls='pos';
-  else if(v==='outflow'||v==='down'||v==='contracting'||v==='risk_off') cls='neg';
+  if(v==='inflow'||v==='up'||v==='expanding'||v==='risk_on'||v.indexOf('up')>=0) cls='pos';
+  else if(v==='outflow'||v==='down'||v==='contracting'||v==='risk_off'||v.indexOf('down')>=0) cls='neg';
   else if(v==='mixed'||v==='transition') cls='mix';
   return '<span class="'+cls+'">'+v+'</span>';
 }
+function mget(w,id){return (w.Markets&&w.Markets[id])||{}}
+function feat(w,id){return (w.Live&&w.Live.Features&&w.Live.Features[id])||{}}
+function pct(v){if(!isNum(v)) return '—'; return (v*100).toFixed(2)+'%'}
+function tapeOf(m){
+  if(m.QuoteHealth==='STALE') return 'STALE';
+  if(String(m.MarketStatus||'').toUpperCase()==='TRADEABLE') return 'LIVE';
+  if((m.HistoryStatus||'')==='WARMING') return 'WARMING';
+  return 'CLOSED';
+}
+function attnBar(v){ var n=isNum(v)?Math.max(0,Math.min(100,v)):0; return '<div class="bar"><i style="width:'+n+'%"></i></div>'; }
 function paintWorld(w){
+  lastWorld=w;
   if(!w||w.status==='WAITING'){ el('gkv').innerHTML='<span>WorldState</span><b>WAITING</b>'; return; }
   kv('gkv',[
     ['Liquidity', w.Liquidity?w.Liquidity.Class:'—'],
-    ['Label', w.Liquidity?w.Liquidity.Label:'—'],
     ['Risk', w.Risk||'—'],
     ['USD', w.USD&&w.USD.USD?w.USD.USD:'—'],
     ['Session', w.Session||'—'],
-    ['Official completeness', w.Confidence==null?'—':String(w.Confidence)],
     ['World hash', w.Hash||'—'],
     ['World valid', w.Valid||'—']
   ]);
-  el('truth').textContent='Official origin: '+(w.Origins&&w.Origins.length?w.Origins.join(', '):'UNKNOWN')+' · '+ (w.Valid||'WAITING');
+  el('truth').textContent='Official origin: '+(w.Origins&&w.Origins.length?w.Origins.join(', '):'UNKNOWN')+' · '+(w.Valid||'WAITING');
+  el('h-wd').textContent=w.Valid==='CURRENT_WORLD_STATE_VALID'?'PARTIAL':'WAITING';
   var R=w.Regions||{};
-  function rtxt(id,elid){
-    var x=R[id]||{}; el(elid).textContent=(x.Equity||x.Health||'WAITING');
-  }
-  rtxt('JAPAN','m-asia'); rtxt('EUROPE','m-eu'); rtxt('UNITED_STATES','m-us');
+  el('cmd-asia').textContent=(R.JAPAN&&R.JAPAN.Equity)||'WAITING';
+  el('cmd-eu').textContent=(R.EUROPE&&R.EUROPE.Equity)||'WAITING';
+  el('cmd-us').textContent=(R.UNITED_STATES&&R.UNITED_STATES.Equity)||'WAITING';
   var rows=[];
   ['UNITED_STATES','EUROPE','JAPAN','CHINA_HONG_KONG'].forEach(function(k){
-    var x=R[k]||{};
-    rows.push([k, (x.Equity||'—')+' · '+(x.Health||'UNKNOWN')]);
+    var x=R[k]||{}; rows.push([k, (x.Equity||'—')+' · '+(x.Health||'UNKNOWN')]);
   });
   kv('rkv', rows);
   var A=w.AssetClasses||{};
@@ -686,82 +807,104 @@ function paintWorld(w){
     tr.innerHTML='<td>'+k+'</td><td>'+cell(a.Momentum)+'</td><td>'+cell(a.Flow)+'</td><td>'+cell(a.Positioning)+'</td><td>'+cell(a.Macro)+'</td><td>'+cell(a.Risk)+'</td><td>'+cell(a.Opportunity)+'</td>';
     tb.appendChild(tr);
   });
-  var op=w.Opportunity||[];
-  var ot=document.querySelector('#oradar tbody'); ot.innerHTML='';
-  op.forEach(function(m,i){
-    var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+(i+1)+'</td><td>'+m.Market+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Setup||'NONE')+'</td><td>'+cell(m.MacroAlignment)+'</td><td>'+cell(m.CapitalFlowContext)+'</td><td>'+cell(m.Positioning)+'</td><td>'+(m.MicroAvailable?'ready':'unavailable')+'</td><td>'+(m.Eligibility||m.EligReason||'ANALYSIS_ONLY')+'</td><td>'+(m.Proposal||'WATCH')+'</td>';
-    tr.onclick=function(){
-      var live=w.Live&&w.Live.Features?w.Live.Features[m.Market]:null;
-      el('odetail').textContent='WHY '+m.Market+
-        '\nLive price '+(m.Mid||'—')+' session '+(m.SessionLocal||'—')+
-        '\nMomentum '+(m.PriceTrend||'—')+' vol '+(m.Volatility||'—')+' RS '+(m.RelativeStrength||'—')+
-        '\nMacro '+(m.MacroAlignment||'—')+' flow '+(m.CapitalFlowContext||'—')+' pos '+(m.Positioning||'—')+
-        '\nLegacy '+(m.Setup||'NONE')+' micro '+(m.MicroAvailable?'available (sensing only)':'unavailable')+
-        '\nEligibility '+(m.Eligibility||'ANALYSIS_ONLY')+
-        '\n'+(m.SourceBadge||'UNKNOWN')+
-        '\n'+((m.Evidence||[]).join('\n'))+
-        (live?'\n15m/1h/4h live features present':'');
-    };
-    ot.appendChild(tr);
-  });
+  paintOpp(w);
   paintTape(w);
-  paintHeatLive(w);
+  paintConstel(w);
   paintRotation(w);
-  var fl=w.Flows||[];
-  kv('flows', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')+' '+((f.Strength||0))]}));
-  kv('flowev', fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')]}));
-  el('gtl').textContent='Session '+ (w.Session||'WAITING') +' · Tokyo → Hong Kong → London → New York';
   paintSessionStrip(w);
   paintCompare(w);
+  paintHero(selMkt,w);
+  var fl=w.Flows||[];
+  kv('flowev', fl.length?fl.map(function(f){return [f.Region+' '+f.AssetClass, (f.Direction||'UNKNOWN')]}):[['Official flow','UNKNOWN']]);
+  kv('sesskv',[
+    ['Session', w.Session||'WAITING'],
+    ['Liquidity', w.Liquidity?w.Liquidity.Class:'UNKNOWN'],
+    ['Risk', w.Risk||'UNKNOWN']
+  ]);
   kv('riskkv',[
     ['Unit', 'account_currency_risk'],
     ['Aggregate risk cap', '$300 DEMO'],
-    ['Per region / asset', '$150 DEMO'],
     ['Used', 'UNKNOWN until monetary calibration'],
-    ['Groups', 'US_EQUITY_INDEX · PRECIOUS_METALS · ENERGY · EUROPE_EQUITY · ASIA_EQUITY · CRYPTO']
+    ['Remaining', '$300 DEMO']
   ]);
-  kv('dqkv',[
-    ['Official context', (document.getElementById('truth')&&el('truth').textContent)||'WAITING'],
-    ['Live price coverage', liveCov(w)],
-    ['History readiness', histCov(w)],
-    ['Micro readiness', (mget(w,'BTC').MicroAvailable?'BTC sensors healthy':'BTC micro unavailable')]
+  el('riskbars').innerHTML='<div class="note">TOTAL — / $300 DEMO</div><div class="bar"><i style="width:0"></i></div>'+
+    '<div class="note">PRECIOUS — / $150 · US EQUITY — / $150</div>';
+  if(el('wstrip')){
+    el('wstrip').innerHTML=
+      chip('LIQUIDITY', w.Liquidity?w.Liquidity.Class:'UNKNOWN')+
+      chip('RISK', w.Risk||'UNKNOWN')+
+      chip('USD', w.USD&&w.USD.USD?w.USD.USD:'UNKNOWN')+
+      chip('RATES', 'US —');
+  }
+}
+function chip(k,v){return '<div class="chipk">'+k+'<b>'+v+'</b></div>'}
+function paintOpp(w){
+  var op=w.Opportunity||[], box=el('oppbox'); if(!box) return; box.innerHTML='';
+  op.slice(0,8).forEach(function(m,i){
+    var d=document.createElement('div'); d.className='orow';
+    d.innerHTML='<div>'+(i+1)+'</div><div><b>'+m.Market+'</b>'+attnBar(m.Attention)+
+      '<div class="meta">ATTENTION '+num(isNum(m.Attention),m.Attention,0)+' · Evidence '+num(isNum(m.Coverage),m.Coverage,0)+'% · '+(m.Eligibility||'ANALYSIS_ONLY')+'</div></div>';
+    d.onclick=function(){ selectMarket(m.Market); showWhy(w,m); };
+    box.appendChild(d);
+  });
+}
+function showWhy(w,m){
+  el('odetail').textContent='WHY ATTENTION '+m.Market+
+    '\nMomentum '+(m.PriceTrend||'—')+' · vol '+(m.Volatility||'—')+
+    '\nLegacy '+(m.Setup||'INSUFFICIENT_DATA')+
+    '\nEligibility '+(m.Eligibility||'ANALYSIS_ONLY');
+}
+function paintConstel(w){
+  var groups=[['US',['US100','US500','US30']],['EUROPE',['DE40','UK100']],['ASIA',['J225','CN50']],['METALS',['GOLD','SILVER']],['ENERGY',['OIL_CRUDE']],['CRYPTO',['BTC']]];
+  var host=el('constel'); if(!host) return; host.innerHTML='';
+  var opp={}; (w.Opportunity||[]).forEach(function(m){opp[m.Market]=m});
+  groups.forEach(function(g){
+    g[1].forEach(function(id){
+      var m=Object.assign({},mget(w,id),opp[id]||{});
+      var f=feat(w,id);
+      var st=tapeOf(m);
+      var d=document.createElement('div');
+      d.className='tile'+(st==='LIVE'?' live':' closed');
+      d.setAttribute('data-sym',id);
+      var px=isNum(m.Mid)&&m.Mid>0?group(m.Mid.toFixed(id==='BTC'?1:2)):'—';
+      var dir=String(m.PriceTrend||'');
+      var arrow=dir.indexOf('UP')>=0?'▲':dir.indexOf('DOWN')>=0?'▼':'·';
+      d.innerHTML='<b>'+id+'</b><div class="px">'+px+'</div><div class="meta">'+arrow+' '+st+' · 15m '+pct(f.Ret15m)+' · 1h '+pct(f.Ret1h)+'</div>'+attnBar(m.Attention);
+      d.onclick=function(){ selectMarket(id); };
+      host.appendChild(d);
+    });
+  });
+}
+function selectMarket(id){
+  selMkt=id;
+  if(lastWorld) paintHero(id,lastWorld);
+}
+function paintHero(id,w){
+  var m=Object.assign({},mget(w,id));
+  (w.Opportunity||[]).forEach(function(x){ if(x.Market===id) m=Object.assign(m,x); });
+  el('mhero-nm').textContent=id;
+  el('mhero-px').textContent=isNum(m.Mid)&&m.Mid>0?group(m.Mid.toFixed(2)):EmptyClosed(m);
+  el('mhero-st').textContent=tapeOf(m)==='CLOSED'?'MARKET CLOSED':tapeOf(m);
+  kv('mherokv',[
+    ['Session', m.SessionLocal||m.MarketStatus||'UNKNOWN'],
+    ['ATTENTION', num(isNum(m.Attention),m.Attention,0)],
+    ['Coverage', num(isNum(m.Coverage),m.Coverage,1)+'%'],
+    ['Eligibility', m.Eligibility||'DEMO_DISCOVERED']
   ]);
 }
-function mget(w,id){return (w.Markets&&w.Markets[id])||{}}
-function feat(w,id){return (w.Live&&w.Live.Features&&w.Live.Features[id])||{}}
-function pct(v){if(!isNum(v)) return '—'; return (v*100).toFixed(2)+'%'}
+function EmptyClosed(m){ return tapeOf(m)==='CLOSED'?'—':'—'; }
 function paintTape(w){
   var ids=['US100','US500','US30','GOLD','SILVER','OIL_CRUDE','DE40','UK100','J225','CN50','BTC'];
   var tb=document.querySelector('#tape tbody'); if(!tb) return; tb.innerHTML='';
-  var opp={};
-  (w.Opportunity||[]).forEach(function(m){opp[m.Market]=m});
+  var opp={}; (w.Opportunity||[]).forEach(function(m){opp[m.Market]=m});
   ids.forEach(function(id){
     var m=Object.assign({},mget(w,id),opp[id]||{});
     var f=feat(w,id);
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+id+'</td><td>'+(m.TapeState||tapeOf(m))+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid),m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+dot(m.HistoryStatus||m.FeatLegacy)+'</td><td>'+dot(m.FeatMomentum)+'</td><td>'+dot(m.FeatVol)+'</td><td>'+dot(m.FeatCross)+'</td><td>'+dot(m.FeatLegacy)+'</td><td>'+(m.MicroAvailable?'●':'○')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Tier||'—')+'</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
+    tr.innerHTML='<td>'+id+'</td><td>'+tapeOf(m)+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid)&&m.Mid>0,m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
+    tr.onclick=function(){ selectMarket(id); };
     tb.appendChild(tr);
   });
-}
-function heatWord(v){
-  v=String(v||'UNKNOWN').toUpperCase();
-  if(v==='UNKNOWN'||v===''||v==='STALE'||v==='CLOSED') return {t:'UNKNOWN',c:'unk'};
-  if(v.indexOf('UP')>=0||v==='EXPANDING'||v==='STRONG_BROAD'||v==='BROAD') return {t:v,c:'pos'};
-  if(v.indexOf('DOWN')>=0||v==='CONTRACTING'||v==='NEGATIVE') return {t:v,c:'neg'};
-  return {t:v,c:'mix'};
-}
-function setHM(id,val){
-  var x=heatWord(val); var n=el(id); if(!n) return;
-  n.textContent=x.t; n.className=x.c;
-}
-function paintHeatLive(w){
-  var M=w.Markets||{};
-  setHM('hv-asia', (M.J225&&M.J225.PriceTrend)||'UNKNOWN');
-  setHM('hv-eu', (M.DE40&&M.DE40.PriceTrend)||'UNKNOWN');
-  setHM('hv-us', (M.US100&&M.US100.PriceTrend)||'UNKNOWN');
-  setHM('hv-com', (M.GOLD&&M.GOLD.PriceTrend)||'UNKNOWN');
-  setHM('hv-cry', (M.BTC&&M.BTC.PriceTrend)||'UNKNOWN');
 }
 function paintRotation(w){
   var L=w.Live||{};
@@ -772,70 +915,42 @@ function paintRotation(w){
     ['Precious metals', (L.Precious&&L.Precious.GoldRS)||'UNKNOWN'],
     ['Energy', (L.Energy&&L.Energy.OilMomentum)||'UNKNOWN'],
     ['Crypto', (mget(w,'BTC').PriceTrend)||'UNKNOWN'],
-    ['Label', 'PRICE LEADERSHIP'],
-    ['Note', 'CORRELATION ≠ CAUSATION']
+    ['Label', 'PRICE LEADERSHIP']
   ]);
 }
-function tapeOf(m){
-  if(m.QuoteHealth==='STALE') return 'STALE';
-  if(String(m.MarketStatus||'').toUpperCase()==='TRADEABLE') return 'LIVE';
-  if((m.HistoryStatus||'')==='WARMING') return 'WARMING';
-  return 'CLOSED';
-}
-function dot(v){
-  v=String(v||'');
-  if(v.indexOf('READY')>=0||v==='PRICE_LIVE'||v==='READY') return '●';
-  if(v==='WARMING'||v==='NOT_READY') return '○';
-  return '·';
-}
-function liveCov(w){
-  var n=0,k=0,M=w.Markets||{};
-  Object.keys(M).forEach(function(id){k++; if(M[id].TapeState==='LIVE'||String(M[id].MarketStatus||'').toUpperCase()==='TRADEABLE') n++;});
-  return n+' / '+k+' TRADEABLE';
-}
-function histCov(w){
-  var n=0,k=0,M=w.Markets||{};
-  Object.keys(M).forEach(function(id){k++; if((M[id].HistoryStatus||'')==='READY') n++;});
-  return n+' / '+k+' READY';
-}
 function paintSessionStrip(w){
-  var t=new Date(w.AsOf||Date.now());
-  var h=t.getUTCHours();
-  function st(open0,open1,pre){
-    if(h>=open0&&h<open1) return 'OPEN';
-    if(pre!=null&&h>=pre&&h<open0) return 'TRANSITION';
-    return 'CLOSED';
-  }
-  if(el('ss-tyo')) el('ss-tyo').textContent=st(0,8,23);
-  if(el('ss-hk')) el('ss-hk').textContent=st(1,8,0);
-  if(el('ss-lon')) el('ss-lon').textContent=st(7,16,6);
-  if(el('ss-ny')) el('ss-ny').textContent=st(13,21,12);
-  var L=w.Live||{};
-  if(el('sslead')) el('sslead').textContent='Regional leadership (price, not capital flow): Asia '+(L.Asia&&L.Asia.Leadership||'UNKNOWN')+' · Europe '+(L.Europe&&L.Europe.Leadership||'UNKNOWN')+' · US '+(L.Breadth&&L.Breadth.State||'UNKNOWN');
+  var t=new Date(w.AsOf||Date.now()), h=t.getUTCHours()+t.getUTCMinutes()/60;
+  function st(a,b,pre){ if(h>=a&&h<b) return 'OPEN'; if(pre!=null&&((pre>a&&(h>=pre||h<a))||(pre<a&&h>=pre&&h<a))) return 'PREOPEN'; return 'CLOSED'; }
+  var segs=[['TOKYO',0,8,23],['HONG KONG',1,8,0],['LONDON',7,16,6],['NEW YORK',13,21,12]];
+  var host=el('sessline'); if(!host) return; host.innerHTML='';
+  segs.forEach(function(s){
+    var sp=document.createElement('span');
+    var left=(s[1]/24)*100, width=((s[2]-s[1]+24)%24)/24*100;
+    sp.style.left=left+'%'; sp.style.width=width+'%';
+    var state=st(s[1],s[2],s[3]);
+    sp.textContent=s[0]+' '+state;
+    sp.style.background=state==='OPEN'?'rgba(95,191,150,.12)':state==='PREOPEN'?'rgba(212,177,90,.10)':'transparent';
+    host.appendChild(sp);
+  });
+  var now=document.createElement('i'); now.className='now'; now.style.left=((h/24)*100)+'%'; host.appendChild(now);
+  if(el('sslead')) el('sslead').textContent='TOKYO · HONG KONG · LONDON · NEW YORK · clock-descriptive · broker marketStatus authoritative';
 }
-var cmpPair=['GOLD','SILVER'];
 document.querySelectorAll('[data-cmp]').forEach(function(b){
   b.onclick=function(){
     document.querySelectorAll('[data-cmp]').forEach(function(x){x.className='tab'});
     b.className='tab on';
     cmpPair=b.getAttribute('data-cmp').split(',');
-    fetch('/api/world').then(function(r){return r.json()}).then(paintCompare).catch(function(){});
+    if(lastWorld) paintCompare(lastWorld);
   };
 });
 function paintCompare(w){
   if(!w) return;
-  var a=cmpPair[0], b=cmpPair[1];
-  var fa=feat(w,a), fb=feat(w,b);
-  kv('cmpkv',[
-    [a+' 1h', pct(fa.Ret1h)],
-    [b+' 1h', pct(fb.Ret1h)],
-    ['Label', 'normalized path · CORRELATION ≠ CAUSATION']
-  ]);
+  var a=cmpPair[0], b=cmpPair[1], fa=feat(w,a), fb=feat(w,b);
+  kv('cmpkv',[[a+' 1h', pct(fa.Ret1h)],[b+' 1h', pct(fb.Ret1h)],['Label', 'normalized path · CORRELATION ≠ CAUSATION']]);
 }
 function paintSources(j){
   if(!j) return;
-  var cat=j.catalog||[];
-  var tb=document.querySelector('#srctab tbody');
+  var cat=j.catalog||[], tb=document.querySelector('#srctab tbody');
   if(tb){
     tb.innerHTML='';
     cat.forEach(function(s){
