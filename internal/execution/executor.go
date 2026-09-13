@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"aurumflow/config"
 	"aurumflow/internal/logger"
 	"aurumflow/internal/market"
 	"aurumflow/pkg/models"
@@ -67,6 +68,104 @@ type ConfirmResponse struct {
 	Epic          string   `json:"epic"`
 }
 
+func (e *Executor) Mode() config.ExecutionMode { return config.ExecutionDemo }
+
+func (e *Executor) throttle() {
+	e.mu.Lock()
+	now := time.Now()
+	if now.Before(e.rateLimit) {
+		time.Sleep(time.Until(e.rateLimit))
+	}
+	e.rateLimit = time.Now().Add(100 * time.Millisecond)
+	e.mu.Unlock()
+}
+
+func (e *Executor) OpenPosition(ctx context.Context, req OpenRequest) (*OpenResult, error) {
+	sig := req.Signal
+	if sig == nil {
+		sig = &models.TradeSignal{Direction: req.Direction, StopLoss: req.StopLoss, TakeProfit: req.TakeProfit}
+	}
+	ref, err := e.SendOrder(ctx, sig, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	return &OpenResult{DealReference: ref}, nil
+}
+
+func (e *Executor) Confirm(ctx context.Context, dealReference string) (*ConfirmResult, error) {
+	cr, err := e.ConfirmDeal(ctx, dealReference)
+	if err != nil {
+		return nil, err
+	}
+	return &ConfirmResult{
+		DealReference: cr.DealReference,
+		DealID:        cr.DealID,
+		Status:        cr.Status,
+		DealStatus:    cr.DealStatus,
+		Level:         cr.Level,
+		Size:          cr.Size,
+		Direction:     cr.Direction,
+		Epic:          cr.Epic,
+	}, nil
+}
+
+func (e *Executor) ClosePosition(ctx context.Context, dealID string) (*CloseResult, error) {
+	e.throttle()
+	ack, err := e.Client.ClosePosition(ctx, dealID)
+	if err != nil {
+		return nil, err
+	}
+	out := &CloseResult{DealReference: ack.DealReference, DealID: dealID}
+	if ack.DealReference != "" {
+		if cr, cerr := e.ConfirmDeal(ctx, ack.DealReference); cerr == nil && cr != nil {
+			out.Status = cr.Status
+			out.Level = cr.Level
+			if cr.DealID != "" {
+				out.DealID = cr.DealID
+			}
+		}
+	}
+	return out, nil
+}
+
+func (e *Executor) UpdatePosition(ctx context.Context, req UpdateRequest) (*CloseResult, error) {
+	e.throttle()
+	ack, err := e.Client.UpdatePosition(ctx, req.DealID, market.UpdatePositionRequest{
+		StopLevel:    req.StopLevel,
+		ProfitLevel:  req.ProfitLevel,
+		TrailingStop: req.TrailingStop,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &CloseResult{DealReference: ack.DealReference, DealID: req.DealID}
+	if ack.DealReference != "" {
+		if cr, cerr := e.ConfirmDeal(ctx, ack.DealReference); cerr == nil && cr != nil {
+			out.Status = cr.Status
+			out.Level = cr.Level
+		}
+	}
+	return out, nil
+}
+
+func (e *Executor) Positions(ctx context.Context) ([]Position, error) {
+	pr, err := e.Client.GetPositions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Position, 0, len(pr.Positions))
+	for _, p := range pr.Positions {
+		out = append(out, Position{
+			DealID:    p.Position.DealID,
+			Epic:      p.GetEpic(),
+			Direction: p.Position.Direction,
+			Size:      p.Position.Size,
+			Level:     p.Position.Level,
+		})
+	}
+	return out, nil
+}
+
 // SendOrder builds the position request, enforces 100 ms rate limit, sends POST, then confirms.
 func (e *Executor) SendOrder(ctx context.Context, signal *models.TradeSignal, size float64) (dealRef string, err error) {
 	if signal == nil {
@@ -116,18 +215,23 @@ func (e *Executor) SendOrder(ctx context.Context, signal *models.TradeSignal, si
 
 // ConfirmDeal polls GET /api/v1/confirms/{dealReference} and logs result.
 func (e *Executor) ConfirmDeal(ctx context.Context, dealReference string) (*ConfirmResponse, error) {
-	path := "/api/v1/confirms/" + dealReference
-	data, err := e.Client.Do(ctx, "GET", path, nil, nil)
+	md, err := e.Client.ConfirmDeal(ctx, dealReference)
 	if err != nil {
 		return nil, err
 	}
-	var cr ConfirmResponse
-	if err := json.Unmarshal(data, &cr); err != nil {
-		return nil, fmt.Errorf("parse confirm: %w", err)
+	cr := &ConfirmResponse{
+		DealReference: md.DealReference,
+		DealID:        md.DealID,
+		Status:        md.Status,
+		DealStatus:    md.DealStatus,
+		Level:         md.Level,
+		Size:          md.Size,
+		Direction:     md.Direction,
+		Epic:          md.Epic,
 	}
 	logger.Info("execution: confirm dealRef=%s status=%s dealStatus=%s dealId=%s",
 		cr.DealReference, cr.Status, cr.DealStatus, cr.DealID)
-	return &cr, nil
+	return cr, nil
 }
 
 // LogTrade writes a trade log line to terminal (structured for future metrics).
