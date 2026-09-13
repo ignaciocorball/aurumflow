@@ -58,3 +58,26 @@ func TestAccounts0FallbackDisabled(t *testing.T) {
 		t.Fatal(Accounts0Fallback)
 	}
 }
+
+// DEMO GetAccounts never contains the LIVE config identity. An explicit LIVE
+// account_id (env or config.json) must not become the execution account.
+func TestDemoRuntimeRejectsConfiguredLiveAccountIdentity(t *testing.T) {
+	demoOnly := []market.AccountInfo{
+		{AccountID: "DEMO-CFD-USD", AccountType: "CFD", Currency: "USD", Status: "ENABLED"},
+	}
+	liveFromConfig := "LIVE-ACCOUNT-FROM-CONFIG"
+	id := Resolve(demoOnly, liveFromConfig, "USD")
+	if id.MayTrade || id.Verified || id.Resolution != Blocked {
+		t.Fatalf("DEMO runtime must not select LIVE identity: %+v", id)
+	}
+	if id.AccountID != "" {
+		t.Fatalf("must not bind missing LIVE id: %q", id.AccountID)
+	}
+	if id.Reason != "explicit account not found" {
+		t.Fatalf("reason=%s", id.Reason)
+	}
+	ok := Resolve(demoOnly, "DEMO-CFD-USD", "USD")
+	if !ok.MayTrade || ok.AccountID != "DEMO-CFD-USD" || ok.Resolution != Explicit {
+		t.Fatalf("explicit DEMO must still verify: %+v", ok)
+	}
+}

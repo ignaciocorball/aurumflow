@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"aurumflow/config"
@@ -41,8 +42,25 @@ func runResolveDemoAccount(ctx context.Context) {
 	if ident.AccountID != "" {
 		fmt.Printf("candidate id=%s type=%s currency=%s status=%s\n",
 			execacct.Mask(ident.AccountID), emptyDash(ident.Type), emptyDash(ident.Currency), emptyDash(ident.Status))
+		writeLocalAccountEnv(ident.AccountID)
 	}
 	if !ident.MayTrade {
 		fmt.Println(execacct.Instruction(ident))
 	}
+}
+
+// writeLocalAccountEnv stores the full account id only in a local temp file
+// (0600). Stdout never contains the raw id — reports/git must stay masked.
+func writeLocalAccountEnv(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	path := filepath.Join(os.TempDir(), "aurumflow-demo-account.id")
+	if err := os.WriteFile(path, []byte(id+"\n"), 0o600); err != nil {
+		fmt.Printf("local_env_file=WRITE_FAILED\n")
+		return
+	}
+	fmt.Printf("local_env_file=%s last4=%s\n", path, execacct.Mask(id))
+	fmt.Println("PowerShell: $env:AURUMFLOW_DEMO_ACCOUNT_ID = (Get-Content $env:TEMP\\aurumflow-demo-account.id).Trim()")
 }

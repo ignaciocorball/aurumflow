@@ -100,9 +100,13 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 	histReq := strathist.RequirementsFromConfig(sess.cfg)
 	histStarted := time.Now().UTC()
 	hist := strathist.Seed(ctx, sess.client, epic, histReq, histStarted)
-	logger.Info("history seed status=%s M5=%d/%d M15=%d/%d H1=%d/%d H4=%d/%d warmup=%s",
-		hist.Status, hist.M5Count, histReq.M5Required, hist.M15Count, histReq.M15Required,
-		hist.H1Count, histReq.H1Required, hist.H4Count, histReq.H4Required, time.Since(histStarted).Round(time.Millisecond))
+	logger.Info("history seed status=%s M5=%d/%d oldest=%s latest=%s M15=%d/%d oldest=%s latest=%s H1=%d/%d oldest=%s latest=%s H4=%d/%d oldest=%s latest=%s warmup=%s",
+		hist.Status,
+		hist.M5Count, histReq.M5Required, rfcOrDash(hist.M5Oldest), rfcOrDash(hist.M5Latest),
+		hist.M15Count, histReq.M15Required, rfcOrDash(hist.M15Oldest), rfcOrDash(hist.M15Latest),
+		hist.H1Count, histReq.H1Required, rfcOrDash(hist.H1Oldest), rfcOrDash(hist.H1Latest),
+		hist.H4Count, histReq.H4Required, rfcOrDash(hist.H4Oldest), rfcOrDash(hist.H4Latest),
+		time.Since(histStarted).Round(time.Millisecond))
 	gateErr := gates.DemoWeekTradeAllowed(gates.Input{
 		Environment: "demo", Host: sess.client.BaseURL, ExecutionMode: string(config.ExecutionDemo),
 		AccountOK: sess.Identity.MayTrade, KillSwitch: ks.HaltNewOrders(), MarketStatus: details.Snapshot.MarketStatus,
@@ -399,4 +403,11 @@ func asString(v any) string {
 		return s
 	}
 	return ""
+}
+
+func rfcOrDash(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.UTC().Format(time.RFC3339)
 }
