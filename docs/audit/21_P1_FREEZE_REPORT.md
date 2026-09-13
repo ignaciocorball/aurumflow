@@ -3,28 +3,39 @@
 ## P1 STATUS
 
 ```text
-P1 FREEZE: READY — DEMO RUNTIME PENDING
+P1 FREEZE: READY
+CAPITAL DEMO EXECUTION PLANE: VERIFIED_WORKING
 ```
 
-Offline contract is complete and tested. Capital.com DEMO runtime was not executed because **explicit DEMO credentials are not present**. LIVE credentials were not used.
+Readonly DEMO canary is proven. Controlled OPEN → CONFIRM → READ → CLOSE was proven on TRADEABLE `BTCUSD` because GOLD was CLOSED. Final canary positions = 0. See `22_P1_RUNTIME_PROOF.md`.
 
-## Confirmed (offline)
+Historical P0 documents (`00`–`17`) were not rewritten.
 
-- LIVE fail-closed at config + HTTP + main
-- Execution modes DISABLED / DRY_RUN / DEMO
-- Host hard-gate (DEMO only)
-- Kill switch (config/env/file)
-- Close + update + confirm primitives + tests
-- Account selection
-- InstrumentSpec + min/max/step caps
-- Journal lifecycle events
-- 117 unit tests, vet, build
+## Confirmed
 
-## Pending (runtime)
+Offline / httptest:
 
-- DEMO auth / accounts / prices / positions
-- Controlled DEMO open → confirm → close
-- Bot DEMO canary on GOLD
+- LIVE fail-closed
+- DISABLED / DRY_RUN / DEMO
+- Host hard-gate
+- Kill switch
+- Close / update / confirm primitives
+- Account selection (no `accounts[0]`)
+- 152 unit tests, vet, build
+
+DEMO runtime:
+
+- Authentication: VERIFIED_WORKING
+- Account discovery: VERIFIED_WORKING
+- Market details GOLD: VERIFIED_WORKING (CLOSED)
+- Prices: VERIFIED_WORKING (readonly)
+- Positions read: VERIFIED_WORKING (open=0 after canary)
+- Lifecycle mutation: VERIFIED_WORKING on BTCUSD
+
+## Pending (not P1 blockers)
+
+- GOLD `RUNTIME_VALIDATED` monetary spec (Sunday `--calibrate-instrument GOLD`)
+- GOLD strategy loop (blocked until TRADEABLE + runtime money validation)
 
 ## Security
 
@@ -32,19 +43,8 @@ Offline contract is complete and tested. Capital.com DEMO runtime was not execut
 SECRET SCAN: PASS
 ```
 
-No API keys, passwords, Telegram/Pushover tokens, or Firebase private keys were added to git.
-
-## Tests
-
-```text
-Before P1: 66
-After P1:  117
-Pass:      117
-Fail:      0
-```
-
-New coverage: config, market, execution, risk, killswitch.
+`config/demo_config.json` is gitignored and contains no credentials. LIVE `config/config.json` was not modified.
 
 ## Next
 
-Provide `AURUMFLOW_DEMO_*` and run `--canary-readonly`. Do not start Institutional Radar until that proof exists if runtime certainty is required. P2 (provider split / instrument registry) can proceed on the offline contract.
+P2/P3 weekend platform is in `23`–`28`. Sunday: prepare/calibrate GOLD then `--demo-week`.
