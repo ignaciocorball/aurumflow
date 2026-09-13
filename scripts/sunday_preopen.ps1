@@ -13,7 +13,7 @@ Add-Type -Namespace Native -Name Power -MemberDefinition @"
 [System.Runtime.InteropServices.DllImport("kernel32.dll")]
 public static extern uint SetThreadExecutionState(uint esFlags);
 "@
-[void][Native.Power]::SetThreadExecutionState(0x80000000 -bor 0x00000001 -bor 0x00000040)
+[void][Native.Power]::SetThreadExecutionState([Convert]::ToUInt32("80000041", 16))
 
 function Write-Log([string]$msg) {
     $line = "{0:u} {1}" -f (Get-Date).ToUniversalTime(), $msg
