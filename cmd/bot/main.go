@@ -15,6 +15,7 @@ import (
 
 	"aurumflow/config"
 	"aurumflow/internal/backtest"
+	"aurumflow/internal/binanceusdm"
 	"aurumflow/internal/core"
 	"aurumflow/internal/execution"
 	"aurumflow/internal/journal"
@@ -50,6 +51,16 @@ func main() {
 	statusOnly := flag.Bool("status", false, "print /status from the local ops surface")
 	haltOrders := flag.Bool("halt-new-orders", false, "persist HALT_NEW_ORDERS (.aurumflow.kill)")
 	statusAddr := flag.String("status-addr", "127.0.0.1:8765", "ops HTTP bind address")
+	downloadResearch := flag.Bool("download-research-data", false, "download free-core historical datasets (no secrets)")
+	preset := flag.String("preset", "free-core", "download preset")
+	researchDays := flag.Int("research-days", 30, "historical days for download/research")
+	researchName := flag.String("research", "", "research experiment (btc-radar)")
+	fromDate := flag.String("from", "", "research start YYYY-MM-DD")
+	toDate := flag.String("to", "", "research end YYYY-MM-DD")
+	collectMD := flag.Bool("collect-market-data", false, "persist live public microstructure chunks")
+	collectMesh := flag.Bool("collect-free-mesh", false, "continuous free data mesh collector")
+	collectMin := flag.Int("collect-minutes", 60, "collector duration minutes")
+	wssDiag := flag.Bool("wss-diag", false, "diagnose public Binance WSS connectivity")
 	flag.Parse()
 
 	if *backtestFrom != "" && *backtestTo != "" {
@@ -91,6 +102,31 @@ func main() {
 	}
 	if *demoWeek {
 		runDemoWeek(context.Background(), *epicFlag, *statusAddr)
+		return
+	}
+	if *wssDiag {
+		d := binanceusdm.DiagnoseWSS(context.Background())
+		logger.Info("WSS diag dns=%s tls=%s connect=%s read=%s status=%s", d.DNS, d.TLS, d.Connect, d.Read, d.Status)
+		return
+	}
+	if *downloadResearch {
+		runDownloadResearch(context.Background(), *preset, *researchDays)
+		return
+	}
+	if *researchName != "" {
+		if *researchName != "btc-radar" {
+			logger.Error("unknown research experiment %s", *researchName)
+			os.Exit(1)
+		}
+		runResearchBTC(context.Background(), *fromDate, *toDate, *researchDays)
+		return
+	}
+	if *collectMesh {
+		runCollectFreeMesh(context.Background(), time.Duration(*collectMin)*time.Minute)
+		return
+	}
+	if *collectMD {
+		runCollectMarketData(context.Background(), time.Duration(*collectMin)*time.Minute)
 		return
 	}
 	if *flatten && demoEnvConfigured() {
