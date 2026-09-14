@@ -60,15 +60,17 @@ func (c *Coordinator) Reserve(req Request) error {
 	if req.Halt {
 		return ErrHalt
 	}
-	if req.Origin == OriginMirror {
-		if !req.Validated || !req.MonetaryOK || !req.DataFresh || !req.Tradeable {
-			return ErrNotEligible
-		}
+	if req.Origin == OriginMirror || req.Origin == OriginGold {
 		if req.OpenStrategy >= 2 {
 			return ErrNotEligible
 		}
 		g := portfoliorisk.GroupOf(req.Market)
-		if req.GroupOpen[g] >= 1 && req.Market != "GOLD" {
+		if g != "" && req.GroupOpen[g] >= 1 {
+			return ErrNotEligible
+		}
+	}
+	if req.Origin == OriginMirror {
+		if !req.Validated || !req.MonetaryOK || !req.DataFresh || !req.Tradeable {
 			return ErrNotEligible
 		}
 	}

@@ -301,7 +301,7 @@ body.dense .ov{gap:8px}
 <section id="view-execution" class="view">
   <div class="grid2">
     <section class="glass">
-      <h2>GOLD execution · DEMO · SHADOW</h2>
+      <h2>GOLD · origin GOLD_STRATEGY · DEMO SHADOW</h2>
       <div id="gclosed">
         <div class="hero-nm">GOLD</div>
         <div class="hero-px">CLOSED</div>
@@ -314,11 +314,16 @@ body.dense .ov{gap:8px}
       </div>
     </section>
     <section class="glass">
-      <h2>Eligibility / operational trust</h2>
-      <div class="gates" id="gates"></div>
-      <div class="note">OBSERVATIONAL · NOT EXECUTION INPUT</div>
+      <h2>US100 · origin DEMO_MIRROR</h2>
+      <div class="kv" id="u100exec"></div>
+      <div class="note" id="u100note">Read-only. Frozen LEGACY_NORMALIZED_V0 only. No order controls.</div>
     </section>
   </div>
+  <section class="glass" style="margin-top:12px">
+    <h2>Eligibility / operational trust</h2>
+    <div class="gates" id="gates"></div>
+    <div class="note">OBSERVATIONAL · NOT EXECUTION INPUT</div>
+  </section>
   <section class="glass" style="margin-top:12px">
     <h2>Portfolio risk</h2>
     <div class="note">account_currency_risk · Aggregate risk cap: $300 DEMO</div>
@@ -603,6 +608,23 @@ function paint(s){
     el('gclosed').innerHTML='<div class="hero-nm">GOLD</div><div class="hero-px">'+(ms||'CLOSED')+'</div>'+
       '<div>BROKER MARKET · '+(ms||'WAITING')+'</div><div class="note">Clock '+txt(s.strategy_session)+' · Policy '+txt(s.session_policy)+' · Eligible '+(s.session_eligible?'YES':'NO')+'</div>';
   }
+  if(el('u100exec')){
+    kv('u100exec',[
+      ['Origin', txt(s.us100_origin)||'DEMO_MIRROR'],
+      ['Status', txt(s.us100_status)],
+      ['Shadow', txt(s.us100_shadow)],
+      ['DEMO eligible', txt(s.us100_demo_eligible)],
+      ['Mirror armed', txt(s.us100_mirror_armed)],
+      ['Direction', txt(s.us100_direction)],
+      ['Entry', num(isNum(s.us100_entry)&&s.us100_entry>0,s.us100_entry,2)],
+      ['Current', num(isNum(s.us100_current)&&s.us100_current>0,s.us100_current,2)],
+      ['SL', num(isNum(s.us100_sl)&&s.us100_sl>0,s.us100_sl,2)],
+      ['TP', num(isNum(s.us100_tp)&&s.us100_tp>0,s.us100_tp,2)],
+      ['UPL', num(isNum(s.us100_upl),s.us100_upl,2)],
+      ['Risk', num(isNum(s.us100_risk)&&s.us100_risk>0,s.us100_risk,2)],
+      ['Lifecycle', txt(s.us100_lifecycle)]
+    ]);
+  }
   kv('cvdkv',[
     ['CVD', num(isNum(s.cvd)&&s.cvd!==0,s.cvd,2)],
     ['Vel 1s', num(isNum(s.flow_velocity_1s)&&s.flow_velocity_1s!==0,s.flow_velocity_1s,2)]
@@ -850,12 +872,12 @@ function paintWorld(w){
   ]);
   kv('riskkv',[
     ['Unit', 'account_currency_risk'],
-    ['Aggregate risk cap', '$300 DEMO'],
-    ['Used', 'UNKNOWN until monetary calibration'],
-    ['Remaining', '$300 DEMO']
+    ['Open positions', s.portfolio_open==null?miss():String(s.portfolio_open)],
+    ['Precious group', s.precious_group_open==null?miss():String(s.precious_group_open)+' / 1'],
+    ['US equity group', s.us_equity_group_open==null?miss():String(s.us_equity_group_open)+' / 1'],
+    ['HALT_NEW_ORDERS', s.halt_new_orders?'YES':'NO']
   ]);
-  el('riskbars').innerHTML='<div class="note">TOTAL — / $300 DEMO</div><div class="bar"><i style="width:0"></i></div>'+
-    '<div class="note">PRECIOUS — / $150 · US EQUITY — / $150</div>';
+  el('riskbars').innerHTML='<div class="note">max concurrent strategy/mirror = 2 · GOLD + US100 may coexist</div>';
   if(el('wstrip')){
     el('wstrip').innerHTML=
       chip('LIQUIDITY', w.Liquidity?w.Liquidity.Class:'UNKNOWN')+

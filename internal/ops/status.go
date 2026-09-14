@@ -178,6 +178,27 @@ type Status struct {
 	ConsumerMaxMs     float64     `json:"consumer_max_ms"`
 	ResyncReason      string      `json:"resync_reason"`
 	ResyncLog         string      `json:"resync_log"`
+	US100Origin       string      `json:"us100_origin"`
+	US100Status       string      `json:"us100_status"`
+	US100Direction    string      `json:"us100_direction"`
+	US100Entry        float64     `json:"us100_entry"`
+	US100Current      float64     `json:"us100_current"`
+	US100SL           float64     `json:"us100_sl"`
+	US100TP           float64     `json:"us100_tp"`
+	US100UPL          float64     `json:"us100_upl"`
+	US100Size         float64     `json:"us100_size"`
+	US100Risk         float64     `json:"us100_risk"`
+	US100Lifecycle    string      `json:"us100_lifecycle"`
+	US100DemoEligible string      `json:"us100_demo_eligible"`
+	US100MirrorArmed  string      `json:"us100_mirror_armed"`
+	US100Shadow       string      `json:"us100_shadow"`
+	US100DealRef      string      `json:"us100_deal_reference"`
+	US100DealID       string      `json:"us100_deal_id"`
+	US100RiskUsed     float64     `json:"us100_risk_used"`
+	HaltNewOrders     bool        `json:"halt_new_orders"`
+	PortfolioOpen     int         `json:"portfolio_open"`
+	PreciousGroup     int         `json:"precious_group_open"`
+	USEquityGroup     int         `json:"us_equity_group_open"`
 }
 
 func NewStatus() Status {

@@ -32,6 +32,10 @@ type Stats struct {
 	CostDrag       float64
 	PositiveThirds int
 	OutlierDom     bool
+	LongExp        float64
+	ShortExp       float64
+	LargestShare   float64
+	First, Last    time.Time
 }
 
 func Simulate(sigs []research.SignalRow, m15 []models.Candle, spread float64, scenario string, split chronosplit.Split) []Trade {
@@ -113,7 +117,7 @@ func Summarize(tr []Trade) Stats {
 	if st.N == 0 {
 		return st
 	}
-	var win, lose, sum, mfe, mae float64
+	var win, lose, sum, mfe, mae, longSum, shortSum float64
 	var rs []float64
 	eq, peak, dd := 0.0, 0.0, 0.0
 	thirds := [3]float64{}
@@ -129,10 +133,18 @@ func Summarize(tr []Trade) Stats {
 	for i, t := range tr {
 		sum += t.R
 		rs = append(rs, t.R)
+		if st.First.IsZero() || t.T0.Before(st.First) {
+			st.First = t.T0
+		}
+		if t.T0.After(st.Last) {
+			st.Last = t.T0
+		}
 		if t.Dir > 0 {
 			st.Long++
+			longSum += t.R
 		} else {
 			st.Short++
+			shortSum += t.R
 		}
 		if t.R > 0 {
 			win += t.R
@@ -190,6 +202,15 @@ func Summarize(tr []Trade) Stats {
 		if thirdN[i] > 0 && thirds[i] >= 0 {
 			st.PositiveThirds++
 		}
+	}
+	if st.Long > 0 {
+		st.LongExp = longSum / float64(st.Long)
+	}
+	if st.Short > 0 {
+		st.ShortExp = shortSum / float64(st.Short)
+	}
+	if sum > 0 {
+		st.LargestShare = best / sum
 	}
 	if sum > 0 && best/sum > 0.40 {
 		st.OutlierDom = true

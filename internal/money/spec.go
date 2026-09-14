@@ -37,6 +37,19 @@ type MonetaryInstrumentSpec struct {
 	CalibrationSource         string
 	CalibrationSamples        int
 	CalibrationDealID         string
+	Estimator                 string
+	PriceMin                  float64
+	PriceMax                  float64
+	PriceRange                float64
+	UPLMin                    float64
+	UPLMax                    float64
+	UPLRange                  float64
+	SlopeMAD                  float64
+	DistinctPrices            int
+	DistinctUPL               int
+	MetadataStatus            string
+	PositionClosed            bool
+	BrokerPositionsAfter      int
 }
 
 func FromMarketDetails(details *market.MarketDetailsResponse) MonetaryInstrumentSpec {

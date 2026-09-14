@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"aurumflow/internal/execacct"
+	"aurumflow/internal/portfoliorisk"
 )
 
 func demoID() execacct.Identity {
@@ -44,15 +45,55 @@ func TestSerializeAndMirrorGates(t *testing.T) {
 }
 
 func TestOriginTags(t *testing.T) {
-	if OriginCalibration != "CALIBRATION_CANARY" || OriginMirror != "DEMO_MIRROR" {
+	if OriginCalibration != "CALIBRATION_CANARY" || OriginMirror != "DEMO_MIRROR" || OriginGold != "GOLD_STRATEGY" {
 		t.Fatal("tags")
 	}
 }
 
-func TestConcurrencyCap(t *testing.T) {
+func TestPortfolioMaxTwo(t *testing.T) {
 	c := New()
 	req := Request{Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror, Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true, OpenStrategy: 2}
 	if err := c.Reserve(req); err != ErrNotEligible {
+		t.Fatal(err)
+	}
+}
+
+func TestUSEquityMaxOne(t *testing.T) {
+	c := New()
+	req := Request{
+		Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror,
+		Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true, Market: "US100",
+		GroupOpen: map[string]int{portfoliorisk.GroupUSEquity: 1},
+	}
+	if err := c.Reserve(req); err != ErrNotEligible {
+		t.Fatal(err)
+	}
+}
+
+func TestGoldAndUS100Coexist(t *testing.T) {
+	c := New()
+	req := Request{
+		Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror,
+		Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true, Market: "US100",
+		OpenStrategy: 1, GroupOpen: map[string]int{portfoliorisk.GroupPrecious: 1},
+	}
+	if err := c.Reserve(req); err != nil {
+		t.Fatal(err)
+	}
+	c.Release()
+	gold := Request{
+		Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginGold,
+		Market: "GOLD", OpenStrategy: 1, GroupOpen: map[string]int{portfoliorisk.GroupUSEquity: 1},
+	}
+	if err := c.Reserve(gold); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHaltNewOrders(t *testing.T) {
+	c := New()
+	req := Request{Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror, Halt: true, Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true}
+	if err := c.Reserve(req); err != ErrHalt {
 		t.Fatal(err)
 	}
 }

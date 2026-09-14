@@ -269,6 +269,17 @@ func ApplyRuntime(spec MonetaryInstrumentSpec, res CalibrationResult) MonetaryIn
 	spec.CalibrationSamples = res.Samples
 	spec.CalibrationDealID = res.EvidenceDealID
 	spec.ValidatedAt = time.Now().UTC()
+	spec.Estimator = res.Estimator
+	spec.PriceMin = res.PriceMin
+	spec.PriceMax = res.PriceMax
+	spec.PriceRange = res.PriceRange
+	spec.UPLMin = res.UPLMin
+	spec.UPLMax = res.UPLMax
+	spec.UPLRange = res.UPLRange
+	spec.SlopeMAD = res.SlopeMAD
+	spec.DistinctPrices = res.DistinctPrices
+	spec.DistinctUPL = res.DistinctUPL
+	spec.MetadataStatus = res.MetadataStatus
 	return spec
 }
 
