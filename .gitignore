@@ -36,6 +36,7 @@ logs/
 /scripts/*
 !/scripts/sunday_preopen.ps1
 !/scripts/sunday_go.ps1
+!/scripts/pilot_supervisor.ps1
 research/prospective/**/signals.jsonl
 research/prospective/**/signal_inputs.jsonl
 research/prospective/**/signal_outcomes.jsonl
@@ -47,6 +48,11 @@ research/prospective/**/signal_outcomes.jsonl
 /journals
 /data
 /artifacts
+!/artifacts/visual-baseline/
+!/artifacts/visual-baseline/**
+
+web/node_modules/
+
 /research/raw
 /research/work
 /research/strategy-trades

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "fomc-2026-09-16",
+    "name": "FOMC decision and press conference",
+    "region": "UNITED_STATES",
+    "at": "2026-09-16T18:00:00Z",
+    "importance": "HIGH",
+    "source": "Board of Governors of the Federal Reserve System",
+    "source_url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+    "asset_classes": ["EQUITIES", "PRECIOUS_METALS", "FX"],
+    "markets": ["US100", "US500", "US30", "GOLD"]
+  },
+  {
+    "id": "fomc-2026-10-28",
+    "name": "FOMC decision and press conference",
+    "region": "UNITED_STATES",
+    "at": "2026-10-28T18:00:00Z",
+    "importance": "HIGH",
+    "source": "Board of Governors of the Federal Reserve System",
+    "source_url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+    "asset_classes": ["EQUITIES", "PRECIOUS_METALS", "FX"],
+    "markets": ["US100", "US500", "US30", "GOLD"]
+  },
+  {
+    "id": "fomc-2026-12-09",
+    "name": "FOMC decision and press conference",
+    "region": "UNITED_STATES",
+    "at": "2026-12-09T19:00:00Z",
+    "importance": "HIGH",
+    "source": "Board of Governors of the Federal Reserve System",
+    "source_url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+    "asset_classes": ["EQUITIES", "PRECIOUS_METALS", "FX"],
+    "markets": ["US100", "US500", "US30", "GOLD"]
+  }
+]
