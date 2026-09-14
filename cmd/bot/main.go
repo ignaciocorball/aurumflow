@@ -78,6 +78,8 @@ func main() {
 	prepareMarket := flag.String("prepare-market", "", "READ-ONLY Capital discovery/spec for a canonical market")
 	calibrateMarket := flag.String("calibrate-market", "", "DEMO-only explicit calibration for one canonical market")
 	prepareUniverse := flag.Bool("prepare-demo-universe", false, "READ-ONLY prepare matrix for all resolved Capital markets (no orders)")
+	p89Fabric := flag.Bool("market-validation", false, "P8.9 parallel multi-market research fabric (DEMO reads only; no GOLD restart)")
+	p89Days := flag.Int("validation-days", 180, "Capital history window in days for --market-validation")
 	auditTrade := flag.String("audit-strategy-trade", "", "read-only reconstruct a strategy trade forensic package")
 	resolveAcct := flag.Bool("resolve-demo-account", false, "read-only DEMO account enumeration (masked ids)")
 	flag.Parse()
@@ -155,6 +157,10 @@ func main() {
 	}
 	if *calibrateMarket != "" {
 		runPrepareMarket(context.Background(), *calibrateMarket, true)
+		return
+	}
+	if *p89Fabric {
+		runP89Fabric(*p89Days)
 		return
 	}
 	if *prepareUniverse {
