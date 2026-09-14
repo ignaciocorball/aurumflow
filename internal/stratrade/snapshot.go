@@ -43,6 +43,16 @@ type PreSignalSnapshot struct {
 	BrokerConnection         string    `json:"broker_connection_state"`
 	JournalState             string    `json:"journal_state"`
 	Immutable                bool      `json:"immutable"`
+	WorldHash                string    `json:"world_hash,omitempty"`
+	Attention                float64   `json:"attention,omitempty"`
+	Coverage                 string    `json:"coverage,omitempty"`
+	Salience                 float64   `json:"salience,omitempty"`
+	ObservationalNote        string    `json:"observational_note,omitempty"`
+	PilotPolicy              string    `json:"pilot_policy,omitempty"`
+	PilotRiskLimit           float64   `json:"pilot_risk_limit,omitempty"`
+	PortfolioRiskBefore      float64   `json:"portfolio_risk_before,omitempty"`
+	StrategyHash             string    `json:"strategy_hash,omitempty"`
+	HistoryReady             bool      `json:"history_ready,omitempty"`
 }
 
 type IntelligenceContext struct {

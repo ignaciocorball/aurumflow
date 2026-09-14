@@ -90,6 +90,22 @@ func TestGoldAndUS100Coexist(t *testing.T) {
 	}
 }
 
+func TestUS100PlusUS500Blocked(t *testing.T) {
+	c := New()
+	req := Request{
+		Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror,
+		Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true, Market: "US500",
+		GroupOpen: map[string]int{portfoliorisk.GroupUSEquity: 1},
+	}
+	if err := c.Reserve(req); err != ErrNotEligible {
+		t.Fatal(err)
+	}
+	req.Market = "US30"
+	if err := c.Reserve(req); err != ErrNotEligible {
+		t.Fatal(err)
+	}
+}
+
 func TestHaltNewOrders(t *testing.T) {
 	c := New()
 	req := Request{Env: "DEMO", Account: demoID(), WantAccountID: "30demo6430", Origin: OriginMirror, Halt: true, Validated: true, MonetaryOK: true, DataFresh: true, Tradeable: true}

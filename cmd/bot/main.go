@@ -83,6 +83,7 @@ func main() {
 	p810 := flag.Bool("promotion-p810", false, "P8.10 promotion audit + limited US100 DEMO_MIRROR (does not restart GOLD)")
 	p810Shadow := flag.Int("us100-shadow-minutes", 4, "US100 live SHADOW prove minutes before optional stay")
 	p810Stay := flag.Bool("us100-stay", false, "keep US100 DEMO_MIRROR process running after shadow prove")
+	us100Mirror := flag.Bool("us100-demo-mirror", false, "US100 DEMO_MIRROR only (no GOLD restart; requires prior DEMO_ELIGIBLE)")
 	auditTrade := flag.String("audit-strategy-trade", "", "read-only reconstruct a strategy trade forensic package")
 	resolveAcct := flag.Bool("resolve-demo-account", false, "read-only DEMO account enumeration (masked ids)")
 	flag.Parse()
@@ -172,6 +173,14 @@ func main() {
 			addr = "127.0.0.1:8767"
 		}
 		runP810(context.Background(), addr, *p810Shadow, *p810Stay)
+		return
+	}
+	if *us100Mirror {
+		addr := *statusAddr
+		if addr == "127.0.0.1:8765" {
+			addr = "127.0.0.1:8767"
+		}
+		runUS100MirrorOnly(context.Background(), addr, *p810Stay)
 		return
 	}
 	if *prepareUniverse {

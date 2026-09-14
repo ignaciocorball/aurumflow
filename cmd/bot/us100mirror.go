@@ -22,14 +22,28 @@ import (
 	"aurumflow/internal/mirror"
 	"aurumflow/internal/money"
 	"aurumflow/internal/ops"
+	"aurumflow/internal/pilotrisk"
 	"aurumflow/internal/portfoliorisk"
 	"aurumflow/internal/promote"
 	"aurumflow/internal/research"
-	"aurumflow/internal/risk"
 	"aurumflow/internal/strategy"
 	"aurumflow/internal/stratrade"
 	"aurumflow/pkg/models"
 )
+
+func runUS100MirrorOnly(ctx context.Context, statusAddr string, stay bool) {
+	spec, err := money.LoadSpec(money.CachePath("", "US100"))
+	if err != nil || !money.EvidenceComplete(spec) {
+		logger.Error("US100 DEMO_MIRROR blocked: monetary evidence incomplete")
+		return
+	}
+	sess, err := bootstrapDemoSession(ctx, config.ExecutionDemo)
+	if err != nil || !sess.Identity.MayTrade {
+		logger.Error("US100 DEMO_MIRROR blocked: explicit DEMO account")
+		return
+	}
+	runUS100Mirror(ctx, statusAddr, 3, stay, spec, sess.Identity)
+}
 
 func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay bool, spec money.MonetaryInstrumentSpec, ident execacct.Identity) {
 	if shadowMin <= 0 {
@@ -64,20 +78,24 @@ func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay 
 			logger.Warn("US100 ops: %v", err)
 		}
 	}()
-	logger.Info("US100 live SHADOW then DEMO_MIRROR · port=%s · strategy=%s · account=%s · GOLD :8765 untouched",
-		statusAddr, promote.FrozenStrategy, execacct.Mask(ident.AccountID))
+	eq := sess.acc.Balance.Balance
+	logger.Info("US100 live SHADOW then DEMO_MIRROR · port=%s · strategy=%s · account=%s · equity=%.2f pilot_pos=%.2f pilot_agg=%.2f · GOLD :8765 untouched",
+		statusAddr, promote.FrozenStrategy, execacct.Mask(ident.AccountID), eq, pilotrisk.PerPositionCap(eq), pilotrisk.EffectiveAggregate(eq, pilotrisk.HardAggregateUSD))
 
 	diskM15 := loadP89Candles(filepath.Join("data", "research", "p89", "capital"), "US100", "MINUTE_15")
 	diskH1 := loadP89Candles(filepath.Join("data", "research", "p89", "capital"), "US100", "HOUR")
 	diskH4 := loadP89Candles(filepath.Join("data", "research", "p89", "capital"), "US100", "HOUR_4")
 	sched := capsched.New(2, 300*time.Millisecond)
 	seen := map[string]bool{}
-	journalOK := writeUS100Shadow(map[string]any{"event": "SHADOW_START", "t": time.Now().UTC(), "strategy": promote.FrozenStrategy})
+	week, _ := stratrade.LoadWeek(stratrade.WeekPath("journals", "US100"), "US100", pilotrisk.MaxTradesMarket)
+	journalOK := writeUS100Shadow(map[string]any{"event": "SHADOW_START", "t": time.Now().UTC(), "strategy": promote.FrozenStrategy, "hash": legacynorm.SpecHash, "pilot": pilotrisk.Policy})
 	armedAfter := time.Now().UTC()
 	proveUntil := time.Now().Add(time.Duration(shadowMin) * time.Minute)
 	scans := 0
 	var rec *stratrade.Recorder
 	halt := ks.HaltNewOrders()
+	st.MaxTrades = week.MaxTrades
+	st.TradeCount = week.CompletedStrategyTrades
 
 	tick := func() {
 		now := time.Now().UTC()
@@ -92,6 +110,7 @@ func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay 
 		}
 		fresh := quotesOK && (mstat == "TRADEABLE" && age < 45 || mstat != "TRADEABLE")
 		sessEv := strategy.EvaluateSession(now, legacynorm.SessionsOf("US100"))
+		nextName, nextAt := strategy.NextEligibleLabel(sessEv, now, legacynorm.SessionsOf("US100"))
 		sigs := []research.SignalRow{}
 		if histReady {
 			sigs = legacynorm.ScanNormalized(m15, h1, h4)
@@ -119,6 +138,8 @@ func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay 
 				logger.Error("US100 CLOSE mismatch — HALT_NEW_ORDERS")
 			}
 			st.US100Lifecycle = "CLOSED"
+			_ = week.MarkClosed(rec.ID())
+			st.TradeCount = week.CompletedStrategyTrades
 			rec = nil
 		}
 		st.HistoryReady = histReady
@@ -129,6 +150,15 @@ func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay 
 		st.SessionReason = sessEv.Reason
 		st.StrategySession = sessEv.ClockSession
 		st.SessionPolicy = sessEv.ConfigPolicy
+		st.NextSession = nextName
+		if !nextAt.IsZero() {
+			st.NextSessionAt = nextAt.UTC().Format(time.RFC3339)
+		}
+		st.TradeCount = week.CompletedStrategyTrades
+		st.MaxTrades = week.MaxTrades
+		if week.BlocksNewStrategy() {
+			st.US100MirrorArmed = "COMPLETE"
+		}
 		st.StrategyReady = histReady && journalOK
 		st.LastScan = now.Format(time.RFC3339)
 		st.LastSignal = lastSig
@@ -161,9 +191,9 @@ func runUS100Mirror(ctx context.Context, statusAddr string, shadowMin int, stay 
 			logger.Info("US100 SHADOW history_ready=%v fresh=%v session=%s eligible=%v scan=RUNNING journal=%v mutation=0",
 				histReady, fresh, sessEv.ClockSession, sessEv.Eligible, journalOK)
 		}
-		if st.US100MirrorArmed == "ON" && rec == nil && usN == 0 && !halt && !ks.HaltNewOrders() {
+		if st.US100MirrorArmed == "ON" && rec == nil && usN == 0 && !halt && !ks.HaltNewOrders() && !week.BlocksNewStrategy() {
 			if cand, ok := latestLiveSignal(sigs, armedAfter, sessEv.Eligible); ok {
-				tryUS100Open(ctx, sess, coord, ks, spec, ident, want, cand, md, m15, pos, goldN, seen, &rec, &st, &halt)
+				tryUS100Open(ctx, sess, coord, ks, spec, ident, want, cand, md, m15, pos, goldN, seen, week, &rec, &st, &halt)
 				srv.Set(st)
 			}
 		}
@@ -221,7 +251,7 @@ func latestLiveSignal(sigs []research.SignalRow, after time.Time, sessionOK bool
 	return research.SignalRow{}, false
 }
 
-func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordinator, ks *killswitch.Switch, spec money.MonetaryInstrumentSpec, ident execacct.Identity, want string, sig research.SignalRow, md *market.MarketDetailsResponse, m15 []models.Candle, pos *market.PositionsResponse, goldN int, seen map[string]bool, rec **stratrade.Recorder, st *ops.Status, halt *bool) {
+func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordinator, ks *killswitch.Switch, spec money.MonetaryInstrumentSpec, ident execacct.Identity, want string, sig research.SignalRow, md *market.MarketDetailsResponse, m15 []models.Candle, pos *market.PositionsResponse, goldN int, seen map[string]bool, week *stratrade.WeekState, rec **stratrade.Recorder, st *ops.Status, halt *bool) {
 	if err := mirror.AllowOrder(mirror.Intent{Source: mirror.SourceNormalized, Signal: sig}); err != nil {
 		return
 	}
@@ -237,7 +267,7 @@ func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordin
 		logger.Info("US100 signal %s held: market %s", sid, "")
 		return
 	}
-	if !money.EvidenceComplete(spec) {
+	if !money.EvidenceComplete(spec) || week.BlocksNewStrategy() {
 		return
 	}
 	idx := len(m15) - 1
@@ -255,26 +285,44 @@ func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordin
 	sl := entry - float64(sig.Direction)*atr
 	tp := entry + float64(sig.Direction)*atr*1.5
 	stopDist := atr
+	if ar, aerr := sess.client.GetAccounts(ctx); aerr == nil {
+		for _, a := range ar.Accounts {
+			if a.AccountID == ident.AccountID && a.Balance.Balance > 0 {
+				sess.acc = a
+				break
+			}
+		}
+	}
 	bal := sess.acc.Balance.Balance
 	if bal <= 0 {
 		logger.Info("US100 signal %s risk reject: unknown DEMO balance", sid)
 		return
 	}
-	isz, err := market.SpecFromDetails(md, spec.MoneyPerPriceUnit)
-	if err != nil {
+	goldRisk := goldOpenRisk(pos)
+	openRisk := 0.0
+	if goldRisk.RiskKnown {
+		openRisk = goldRisk.RiskMoney
+	} else if goldN > 0 {
+		logger.Info("US100 signal %s blocked: GOLD risk unknown", sid)
 		return
 	}
-	size, err := risk.ComputeSize(bal, 0.5, stopDist, isz)
-	if err != nil {
-		logger.Info("US100 signal %s risk reject: %v", sid, err)
+	pd := pilotrisk.Evaluate(pilotrisk.Input{
+		Market: "US100", Equity: bal, StopDistance: stopDist, MPU: spec.MoneyPerPriceUnit,
+		MinDealSize: spec.MinDealSize, SizeStep: spec.SizeIncrement, MaxDealSize: spec.MaxDealSize,
+		OpenRisk: openRisk, TradesThisMarket: week.CompletedStrategyTrades, OpenStrategy: goldN + countEpic(pos, "US100"),
+		GroupOpen: map[string]int{portfoliorisk.GroupPrecious: goldN, portfoliorisk.GroupUSEquity: countEpic(pos, "US100")},
+	})
+	if !pd.Pass {
+		logger.Info("US100 signal %s %s pilot=%s", sid, pd.Block, pilotrisk.Policy)
 		return
 	}
-	expRisk := size * stopDist * spec.MoneyPerPriceUnit
+	size := pd.Size
+	expRisk := pd.PlannedRisk
 	pm := portfoliorisk.New()
-	pm.Caps.MaxOpenPositions = 2
+	pm.Caps.MaxOpenPositions = pilotrisk.MaxStrategyOpen
 	var open []portfoliorisk.Position
 	if goldN > 0 {
-		open = append(open, goldOpenRisk(pos))
+		open = append(open, goldRisk)
 	}
 	pr := pm.Evaluate(open, portfoliorisk.Position{Canonical: "US100", Region: "UNITED_STATES", Asset: "EQUITIES", RiskMoney: expRisk, RiskKnown: true})
 	if !pr.Pass {
@@ -293,16 +341,21 @@ func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordin
 	}
 	defer coord.Release()
 	seen[sid] = true
-	r := stratrade.NewRecorder(filepath.Join("journals", "us100-mirror"), sid)
+	r := stratrade.NewRecorder(filepath.Join("research", "strategy-trades"), sid)
 	*rec = r
+	mid := (md.Snapshot.Bid + md.Snapshot.Offer) / 2
 	_ = r.PersistPreSignal(stratrade.PreSignalSnapshot{
-		SignalID: sid, Timestamp: time.Now().UTC(), StrategyVersion: promote.FrozenStrategy,
+		SignalID: sid, Timestamp: time.Now().UTC(), StrategyVersion: promote.FrozenStrategy, StrategyHash: legacynorm.SpecHash,
 		Origin: demomut.OriginMirror, Instrument: "US100", Direction: dir,
-		Bid: md.Snapshot.Bid, Ask: md.Snapshot.Offer, Spread: md.Snapshot.Offer - md.Snapshot.Bid,
-		MarketStatus: md.Snapshot.MarketStatus, ATR: atr, EntryCandidate: entry, StopLoss: sl, TakeProfit: tp,
+		Bid: md.Snapshot.Bid, Ask: md.Snapshot.Offer, Mid: mid, Spread: md.Snapshot.Offer - md.Snapshot.Bid,
+		MarketStatus: md.Snapshot.MarketStatus, ATR: atr, Session: "NY", HistoryReady: true,
+		EntryCandidate: entry, StopLoss: sl, TakeProfit: tp,
 		StopDistance: stopDist, PositionSize: size, MoneyPerPriceUnit: spec.MoneyPerPriceUnit,
 		ExpectedAccountRisk: expRisk, AccountBalance: bal, Immutable: true,
+		ObservationalNote: stratrade.LabelObservational, PilotPolicy: pilotrisk.Policy,
+		PilotRiskLimit: pd.PerPosCap, PortfolioRiskBefore: openRisk,
 	})
+	_ = r.AttachIntel(stratrade.IntelligenceContext{WorldHash: "", Attention: 0, Coverage: "OBSERVATIONAL", ObservationalOnly: true})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvSignalObserved, SignalID: sid})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvRiskEvaluated, Note: "account_currency_risk"})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvRiskAccepted})
@@ -322,8 +375,42 @@ func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordin
 	r.Bind(sid, ref, conf.DealID)
 	_ = r.Append(stratrade.Event{Event: stratrade.EvBrokerConfirm, DealReference: ref, DealID: conf.DealID})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvPositionResolved})
+	gotEpic, gotDir, gotSize, gotSL, gotTP := conf.Epic, conf.Direction, conf.Size, 0.0, 0.0
+	if fresh, ferr := sess.client.GetPositions(ctx); ferr == nil {
+		for _, p := range fresh.Positions {
+			if strings.EqualFold(p.GetEpic(), "US100") {
+				gotEpic, gotDir, gotSize = p.GetEpic(), p.Position.Direction, p.Position.Size
+				gotSL, gotTP = p.Position.StopLevel, p.Position.ProfitLevel
+			}
+		}
+	}
+	if !mirror.ProtectionOK("US100", gotEpic, dir, gotDir, size, gotSize, sl, gotSL, tp, gotTP, atr*0.15) {
+		*halt = true
+		_ = ks.HaltPersist()
+		logger.Error("US100 protection mismatch — HALT_NEW_ORDERS")
+		_ = r.Append(stratrade.Event{Event: stratrade.EvProtectiveVerified, Severity: "HALT", Note: "SL/TP or identity mismatch"})
+		return
+	}
+	_ = r.Append(stratrade.Event{Event: stratrade.EvPositionReconciled})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvProtectiveVerified})
 	_ = r.Append(stratrade.Event{Event: stratrade.EvMonitoring})
+	_ = week.MarkOpen(sid, sid)
+	fill := conf.Level
+	if fill == 0 {
+		fill = entry
+	}
+	actualStop := fill - sl
+	if actualStop < 0 {
+		actualStop = -actualStop
+	}
+	actualRisk := pilotrisk.ModeledRisk(gotSize, actualStop, spec.MoneyPerPriceUnit)
+	_ = stratrade.WriteRisk(r.Dir(), "", stratrade.RiskRecord{
+		Policy: pilotrisk.Policy, Equity: bal, PerPositionCap: pd.PerPosCap, AggregateCap: pd.AggregateCap,
+		PlannedRisk: expRisk, ActualModeledRisk: actualRisk, Difference: actualRisk - expRisk,
+		StopDistance: actualStop, Size: gotSize, MoneyPerPriceUnit: spec.MoneyPerPriceUnit,
+		PilotStillHolds: actualRisk <= pd.PerPosCap+1e-6,
+	})
+	slip := mirror.EntrySlippage(dir, md.Snapshot.Bid, md.Snapshot.Offer, fill)
 	st.US100Status = "OPEN"
 	st.US100Direction = dir
 	st.US100Entry = conf.Level
@@ -341,8 +428,8 @@ func tryUS100Open(ctx context.Context, sess *demoSession, coord *demomut.Coordin
 	st.US100DealRef = ref
 	st.US100DealID = conf.DealID
 	st.ExpectedRisk = expRisk
-	logger.Info("US100 DEMO_MIRROR OPEN dir=%s size=%.4f entry=%.2f sl=%.2f tp=%.2f risk=%.2f ref=%s",
-		dir, st.US100Size, st.US100Entry, sl, tp, expRisk, ref)
+	logger.Info("US100 DEMO_MIRROR OPEN dir=%s size=%.4f entry=%.2f sl=%.2f tp=%.2f planned=%.4f actual=%.4f slip=%.4f ref=%s",
+		dir, st.US100Size, st.US100Entry, sl, tp, expRisk, actualRisk, slip, ref)
 	_ = writeUS100Shadow(map[string]any{
 		"event": "DEMO_MIRROR_OPEN", "origin": demomut.OriginMirror, "market": "US100",
 		"strategy": promote.FrozenStrategy, "signal_id": sid, "dealReference": ref, "dealId": conf.DealID,

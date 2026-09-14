@@ -67,3 +67,39 @@ func Reconcile(local, broker, pending int) error {
 func HaltOnMismatch(local, broker, pending int) bool {
 	return Reconcile(local, broker, pending) != nil
 }
+
+func ProtectionOK(wantEpic, gotEpic, wantDir, gotDir string, wantSize, gotSize, wantSL, gotSL, wantTP, gotTP, tol float64) bool {
+	if !strings.EqualFold(strings.TrimSpace(wantEpic), strings.TrimSpace(gotEpic)) {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(wantDir), strings.TrimSpace(gotDir)) {
+		return false
+	}
+	if mathAbs(wantSize-gotSize) > 1e-6 {
+		return false
+	}
+	if tol <= 0 {
+		tol = 0.05
+	}
+	if wantSL != 0 && (gotSL == 0 || mathAbs(wantSL-gotSL) > tol) {
+		return false
+	}
+	if wantTP != 0 && (gotTP == 0 || mathAbs(wantTP-gotTP) > tol) {
+		return false
+	}
+	return true
+}
+
+func EntrySlippage(direction string, decisionBid, decisionAsk, brokerEntry float64) float64 {
+	if strings.EqualFold(direction, "SELL") {
+		return decisionBid - brokerEntry
+	}
+	return brokerEntry - decisionAsk
+}
+
+func mathAbs(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
