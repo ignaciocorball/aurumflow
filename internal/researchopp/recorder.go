@@ -41,6 +41,11 @@ type Signal struct {
 	Micro                 string          `json:"micro_capability,omitempty"`
 	ProposalLabel         string          `json:"proposal_label,omitempty"`
 	DataQuality           string          `json:"data_quality,omitempty"`
+	Setup                 string          `json:"setup,omitempty"`
+	Salience              float64         `json:"salience,omitempty"`
+	Components            map[string]float64 `json:"attention_components,omitempty"`
+	IntegrityStatus       string          `json:"integrity_status,omitempty"`
+	IntegrityReason       string          `json:"integrity_reason,omitempty"`
 }
 
 func Path(dir string) string {
@@ -93,13 +98,10 @@ func ShouldRecord(prev *Signal, next Signal) bool {
 	if prev == nil {
 		return true
 	}
-	if prev.WorldHash != next.WorldHash {
-		return true
-	}
 	if prev.Tier != next.Tier || prev.Eligibility != next.Eligibility {
 		return true
 	}
-	if prev.ProposalLabel != next.ProposalLabel || prev.Legacy != next.Legacy || prev.DataQuality != next.DataQuality {
+	if prev.ProposalLabel != next.ProposalLabel || prev.Legacy != next.Legacy || prev.DataQuality != next.DataQuality || prev.Setup != next.Setup {
 		return true
 	}
 	if abs(next.Attention-prev.Attention) >= 5 {

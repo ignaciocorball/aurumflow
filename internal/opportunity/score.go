@@ -78,6 +78,38 @@ func Score(st worldstate.MarketState, ws worldstate.WorldState) Ranked {
 	}
 }
 
+type Component struct {
+	Name   string  `json:"name"`
+	Raw    string  `json:"raw"`
+	Norm   float64 `json:"normalized"`
+	Points float64 `json:"points"`
+	Reason string  `json:"reason"`
+}
+
+func Explain(st worldstate.MarketState, r Ranked) []Component {
+	raw := map[string]string{
+		"MacroAlignment": st.MacroAlignment, "CapitalFlowAlignment": st.CapitalFlowContext,
+		"PositioningAsymmetry": st.Positioning, "CrossAssetConfirmation": st.RelativeStrength,
+		"Momentum": st.PriceTrend, "VolatilitySuitability": st.Volatility,
+		"MicrostructureReadiness": map[bool]string{true: "AVAILABLE", false: "UNAVAILABLE"}[st.MicroAvailable],
+		"DataQuality": string(st.DataQuality),
+	}
+	var out []Component
+	for _, k := range []string{"MacroAlignment", "CapitalFlowAlignment", "PositioningAsymmetry", "CrossAssetConfirmation", "Momentum", "VolatilitySuitability", "MicrostructureReadiness", "DataQuality"} {
+		pts := r.Components[k]
+		norm := 0.0
+		if Weights[k] > 0 {
+			norm = pts / Weights[k]
+		}
+		reason := "unknown/no points"
+		if pts > 0 {
+			reason = "known-state bonus (magnitude ignored)"
+		}
+		out = append(out, Component{Name: k, Raw: raw[k], Norm: norm, Points: pts, Reason: reason})
+	}
+	return out
+}
+
 func CoverageScore(st worldstate.MarketState) float64 {
 	n, known := 0, 0
 	check := func(s string) {
@@ -182,6 +214,22 @@ func freshness(st worldstate.MarketState) worlddomain.Frequency {
 		return worlddomain.FreqLive
 	}
 	return worlddomain.FreqWeekly
+}
+
+// CouplingHint reports ATTENTION_COVERAGE_COUPLING when V1 attention
+// tracks evidence completeness too closely. Diagnostic only; no retune.
+func CouplingHint(attention, coverage float64) string {
+	if coverage <= 0 {
+		return ""
+	}
+	d := attention - coverage
+	if d < 0 {
+		d = -d
+	}
+	if d < 8 {
+		return "ATTENTION_COVERAGE_COUPLING"
+	}
+	return ""
 }
 
 func ConceptsSeparated(attention float64, setup worlddomain.SetupState, elig worlddomain.ExecEligibility) bool {

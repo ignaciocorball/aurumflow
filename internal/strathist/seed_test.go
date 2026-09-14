@@ -29,6 +29,26 @@ func TestThirtyM15MakesReady(t *testing.T) {
 	}
 }
 
+func TestSeedThenLiveNextCanonicalM15(t *testing.T) {
+	asOf := time.Date(2026, 9, 13, 16, 0, 0, 0, time.UTC)
+	req := RequirementsFromConfig(&config.Config{})
+	var seed []models.Candle
+	for i := 0; i < 20; i++ {
+		seed = append(seed, candle(asOf.Add(-time.Duration(20-i)*15*time.Minute), 4300+float64(i)))
+	}
+	b := Book{M15: seed}
+	b.Refresh(req)
+	next := candle(asOf.Add(15*time.Minute), 4320)
+	later := asOf.Add(16 * time.Minute)
+	b.MergeLive(nil, []models.Candle{next}, nil, nil, req, later)
+	if b.M15Count < 21 {
+		t.Fatalf("live close not merged: %d", b.M15Count)
+	}
+	if !b.M15Latest.Equal(next.Time) {
+		t.Fatalf("latest=%s want=%s", b.M15Latest, next.Time)
+	}
+}
+
 func TestIncompleteBarNotDuplicated(t *testing.T) {
 	asOf := time.Date(2026, 9, 11, 16, 7, 0, 0, time.UTC)
 	start := time.Date(2026, 9, 11, 16, 0, 0, 0, time.UTC)

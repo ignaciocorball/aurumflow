@@ -250,7 +250,7 @@ body.dense .ov{gap:8px}
 <section id="view-markets" class="view">
   <section class="glass">
     <h2>WORLD MARKET TAPE</h2>
-    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Tape</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>Attention</th><th>Coverage</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
+    <table class="heat" id="tape"><thead><tr><th>Market</th><th>Tape</th><th>Session</th><th>Price</th><th>15m</th><th>1h</th><th>4h</th><th>Vol</th><th>Attention</th><th>Coverage</th><th>Salience</th><th>Eligibility</th></tr></thead><tbody></tbody></table>
   </section>
   <section class="glass" style="margin-top:12px">
     <h2>Comparison</h2>
@@ -928,7 +928,7 @@ function paintTape(w){
     var m=Object.assign({},mget(w,id),opp[id]||{});
     var f=feat(w,id);
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+id+'</td><td>'+tapeOf(m)+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid)&&m.Mid>0,m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
+    tr.innerHTML='<td>'+id+'</td><td>'+tapeOf(m)+'</td><td>'+(m.SessionLocal||m.MarketStatus||'UNKNOWN')+'</td><td>'+num(isNum(m.Mid)&&m.Mid>0,m.Mid,2)+'</td><td>'+pct(f.Ret15m)+'</td><td>'+pct(f.Ret1h)+'</td><td>'+pct(f.Ret4h)+'</td><td>'+(m.Volatility||f.VolState||'UNKNOWN')+'</td><td>'+num(isNum(m.Attention),m.Attention,1)+'</td><td>'+num(isNum(m.Coverage),m.Coverage,0)+'%</td><td>'+num(isNum(m.Salience),m.Salience,0)+'</td><td>'+(m.Eligibility||'ANALYSIS_ONLY')+'</td>';
     tr.onclick=function(){ selectMarket(id); };
     tb.appendChild(tr);
   });

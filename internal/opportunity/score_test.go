@@ -54,6 +54,28 @@ func TestScoreExplainableAndNoFabrication(t *testing.T) {
 	}
 }
 
+func TestMomentumIgnoresMagnitude(t *testing.T) {
+	base := worldstate.MarketState{DataQuality: worlddomain.HealthHealthy, Volatility: "NORMAL", RelativeStrength: "FLAT"}
+	up := Rank(worldstate.WorldState{Markets: map[string]worldstate.MarketState{"A": {Market: "A", PriceTrend: "STRONG_DOWN", DataQuality: base.DataQuality, Volatility: "NORMAL", RelativeStrength: "FLAT"}}})
+	flat := Rank(worldstate.WorldState{Markets: map[string]worldstate.MarketState{"B": {Market: "B", PriceTrend: "FLAT", DataQuality: base.DataQuality, Volatility: "NORMAL", RelativeStrength: "FLAT"}}})
+	if len(up) != 1 || len(flat) != 1 || up[0].Components["Momentum"] != flat[0].Components["Momentum"] {
+		t.Fatalf("V1 momentum is known-state not magnitude: %+v %+v", up, flat)
+	}
+	ex := Explain(up[0].State, up[0])
+	if len(ex) != 8 || ex[0].Name == "" {
+		t.Fatal(ex)
+	}
+}
+
+func TestCouplingHint(t *testing.T) {
+	if CouplingHint(45, 50) != "ATTENTION_COVERAGE_COUPLING" {
+		t.Fatal("expected coupling")
+	}
+	if CouplingHint(90, 40) != "" {
+		t.Fatal("distinct axes")
+	}
+}
+
 func TestMissingNotZeroAndCoverageSeparate(t *testing.T) {
 	st := worldstate.MarketState{Market: "OIL", PriceTrend: "UP", DataQuality: worlddomain.HealthUnknown, CapitalFlowContext: "UNKNOWN", Positioning: "UNKNOWN", MacroAlignment: "UNKNOWN"}
 	rs := Rank(worldstate.WorldState{Markets: map[string]worldstate.MarketState{"OIL": st}})

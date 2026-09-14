@@ -16,8 +16,10 @@ import (
 	"aurumflow/internal/logger"
 	"aurumflow/internal/microcap"
 	"aurumflow/internal/mktwarmup"
+	"aurumflow/internal/dataint"
 	"aurumflow/internal/opportunity"
 	"aurumflow/internal/ops"
+	"aurumflow/internal/salience"
 	"aurumflow/internal/orchestrator"
 	"aurumflow/internal/quotehealth"
 	"aurumflow/internal/research"
@@ -32,6 +34,9 @@ var (
 	slowMu   sync.Mutex
 	slowHold worldstate.WorldState
 	prevOpp  = map[string]*researchopp.Signal{}
+	pricePath = map[string][]researchopp.PricePoint{}
+	labeledOpp = map[string]map[string]bool{}
+	lastLabelAt time.Time
 )
 
 func runWorldSnapshot(fixture bool) {
@@ -385,15 +390,25 @@ func materializeLive(srv *ops.Server) {
 		stt.Setup = p.Setup
 		stt.Attention = r.Score
 		stt.Coverage = r.Coverage
+		sal := salienceFor(r.Market, stt, ranks)
+		stt.Salience = sal.Score
+		stt.SalienceReason = sal.Reason
 		ranks[i].State = stt
+		integ := dataint.Classify(st.Drops+st.PersistDrops, st.BookGaps, st.Resyncs, st.BookSynced)
+		if st.IntegrityStatus != "" {
+			integ.Status = st.IntegrityStatus
+			integ.Reason = st.IntegrityReason
+		}
 		sig := researchopp.Stamp(researchopp.Signal{
-			ID: r.Market + "-" + now.Format("200601021504"), T0: now, WorldHash: ws.Hash,
+			ID: r.Market + "-" + now.Format("20060102150405"), T0: now, WorldHash: ws.Hash,
 			Proposal: jsonBytes(p), Ranking: jsonBytes(r), MarketState: jsonBytes(stt),
 			Tier: string(r.Tier), Eligibility: string(r.State.Eligibility),
 			Session: string(ws.Session), MarketStatus: stt.MarketStatus, HistoryReady: stt.HistoryStatus,
-			Attention: r.Score, Coverage: r.Coverage, Legacy: string(p.Setup),
+			Attention: r.Score, Coverage: r.Coverage, Legacy: string(p.Setup), Setup: string(p.Setup),
 			Micro: map[bool]string{true: "AVAILABLE", false: "UNAVAILABLE"}[stt.MicroAvailable],
 			ProposalLabel: p.Decision, DataQuality: string(stt.DataQuality),
+			Salience: sal.Score, Components: r.Components,
+			IntegrityStatus: integ.Status, IntegrityReason: integ.Reason,
 		})
 		if researchopp.ShouldRecord(prevOpp[r.Market], sig) {
 			_ = researchopp.Record("journals", sig)
@@ -402,6 +417,21 @@ func materializeLive(srv *ops.Server) {
 			bumpOpp()
 		}
 		bumpProposal()
+	}
+	if lastFrameOK {
+		for id, q := range lastFrame.Quotes {
+			if q.Mid <= 0 {
+				continue
+			}
+			pricePath[id] = append(pricePath[id], researchopp.PricePoint{T: now, P: q.Mid})
+			if len(pricePath[id]) > 4000 {
+				pricePath[id] = pricePath[id][len(pricePath[id])-2000:]
+			}
+		}
+	}
+	if lastLabelAt.IsZero() || now.Sub(lastLabelAt) >= 30*time.Second {
+		_, _, _ = researchopp.LabelMature("journals", now, pricePath, labeledOpp)
+		lastLabelAt = now
 	}
 	ws = scanner.AttachOpportunity(ws, ranks)
 	_ = elig
@@ -439,6 +469,45 @@ func evalGoldLegacy(h mktwarmup.History) string {
 		return "SHORT"
 	}
 	return ""
+}
+
+func salienceFor(market string, st worldstate.MarketState, ranks []opportunity.Ranked) salience.Result {
+	h := historyOf(market)
+	var bars []salience.Bar
+	src := h.M15Bars
+	if len(src) < 8 {
+		src = h.M5Bars
+	}
+	for _, c := range src {
+		bars = append(bars, salience.Bar{Close: c.Close, High: c.High, Low: c.Low})
+	}
+	var xs []float64
+	for _, r := range ranks {
+		if r.State.MarketStatus != "TRADEABLE" {
+			continue
+		}
+		peer := historyOf(r.Market)
+		srcp := peer.M15Bars
+		if len(srcp) < 8 {
+			srcp = peer.M5Bars
+		}
+		if len(srcp) < 8 {
+			continue
+		}
+		look := 12
+		if len(srcp) < look+1 {
+			look = len(srcp) - 1
+		}
+		a, b := srcp[len(srcp)-1].Close, srcp[len(srcp)-1-look].Close
+		if b > 0 {
+			ret := a - b
+			if ret < 0 {
+				ret = -ret
+			}
+			xs = append(xs, ret/b)
+		}
+	}
+	return salience.Score(salience.Input{Market: market, Bars: bars, DQPenalty: salience.DQPenalty(string(st.DataQuality)), CrossAbsRet: xs})
 }
 
 func cloneMarkets(in map[string]worldstate.MarketState) map[string]worldstate.MarketState {

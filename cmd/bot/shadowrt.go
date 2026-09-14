@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"aurumflow/internal/book"
 	"aurumflow/internal/bookfeatures"
 	"aurumflow/internal/collector"
+	"aurumflow/internal/dataint"
 	"aurumflow/internal/exhaustion"
 	"aurumflow/internal/l2proxy"
 	"aurumflow/internal/logger"
@@ -105,7 +107,8 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 	go func() { _ = srv.ListenAndServe() }()
 	refreshWorld(srv, false)
 
-	bus := md.NewBus(8192)
+	bus := md.NewBus(32768)
+	persist := md.NewPersistQueue(65536)
 	go func() { _ = prov.Run(runCtx, bus) }()
 	if l2Flow != v1Flow {
 		bn := binanceusdm.New()
@@ -117,6 +120,8 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 	var lastBinanceMid, lastOKXMid float64
 
 	var lats []float64
+	var consLats []float64
+	var consMax float64
 	var latSum float64
 	started := time.Now()
 	var pending []candles.Trade
@@ -125,6 +130,22 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 	seenLegacy := map[string]bool{}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
+	go func() {
+		for ev := range persist.C() {
+			persist.MarkDeq()
+			buf.Add(ev)
+			switch ev.Kind {
+			case md.KindTrade:
+				_ = rt.Trades.WriteEvent(ev.EventTime, ev.Seq, ev)
+			case md.KindBookDelta:
+				_ = rt.Depth.WriteEvent(ev.EventTime, ev.Seq, ev)
+			case md.KindBookSnapshot:
+				_ = rt.Snaps.WriteEvent(ev.EventTime, ev.Seq, ev)
+			case md.KindProviderHealth:
+				_ = rt.Health.WriteEvent(ev.EventTime, ev.Seq, ev)
+			}
+		}
+	}()
 	logger.Info("shadow-runtime provider=%s instrument=%s relation=%s duration=%s NO execution provider", prov.Name(), venueInst, relation, dur)
 	if shadow.HasExecutionProvider(rt) {
 		logger.Error("compile invariant violated")
@@ -148,8 +169,8 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 				rt.Metrics.Trades, rt.Metrics.Deltas, rt.Metrics.Snapshots, rt.Metrics.Gaps, rt.Metrics.Resyncs, rt.Metrics.P50Ms, rt.Metrics.P95Ms, rt.Metrics.PeakMemMB)
 			return
 		case ev := <-bus.C():
+			t0 := time.Now()
 			rt.Metrics.Events++
-			buf.Add(ev)
 			lat := ev.ReceiveTime.Sub(ev.EventTime).Seconds() * 1000
 			if lat > 0 && lat < 60_000 {
 				latSum += lat
@@ -166,11 +187,9 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 						rt.Radar.OnTrade(tr.Price, tr.Qty, tr.BuyerMaker)
 						pending = append(pending, candles.Trade{T: ev.EventTime, Price: tr.Price, Qty: tr.Qty})
 					}
-					_ = rt.Trades.WriteEvent(ev.EventTime, ev.Seq, ev)
 				}
 			case md.KindBookDelta:
 				rt.Metrics.Deltas++
-				_ = rt.Depth.WriteEvent(ev.EventTime, ev.Seq, ev)
 				if dlt, ok := ev.Payload.(md.BookDelta); ok && ev.Provider == prov.Name() {
 					bl := make([]book.Level, len(dlt.Bids))
 					al := make([]book.Level, len(dlt.Asks))
@@ -184,12 +203,21 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 				}
 			case md.KindBookSnapshot:
 				rt.Metrics.Snapshots++
-				_ = rt.Snaps.WriteEvent(ev.EventTime, ev.Seq, ev)
 				if ev.Provider == prov.Name() {
 					_, _ = rt.BookFeat.OnSnapshot(bk, ev.EventTime)
 				}
-			case md.KindProviderHealth:
-				_ = rt.Health.WriteEvent(ev.EventTime, ev.Seq, ev)
+			}
+			if !persist.TryEnqueue(ev) {
+				// persist overflow is research loss; live book already applied in the provider
+			}
+			if d := time.Since(t0).Seconds() * 1000; d >= 0 && d < 5000 {
+				consLats = append(consLats, d)
+				if len(consLats) > 2048 {
+					consLats = consLats[len(consLats)-1024:]
+				}
+				if d > consMax {
+					consMax = d
+				}
 			}
 		case now := <-tick.C:
 			now = now.UTC()
@@ -306,6 +334,7 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 			cur.LastUpdate = now.Format(time.RFC3339)
 			cur.EventFreshness = "PUBLIC_WSS"
 			cur.BookFreshness = pq.Quality
+			cur.Alerts = nil
 			if !cur.BookSynced {
 				cur.Alerts = appendUnique(cur.Alerts, "book_unsynced")
 			}
@@ -330,6 +359,11 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 			cur.ProspectiveNeu = countClass(research.ProspectiveDir, exhaustion.ClassNeutral)
 			cur.Mature15m = pst.Mature15m
 			cur.Mature1h = pst.Mature1h
+			if n := len(consLats); n > 0 {
+				cur.ConsumerP50Ms = pct(consLats, 0.5)
+				cur.ConsumerP95Ms = pct(consLats, 0.95)
+				cur.ConsumerMaxMs = consMax
+			}
 			if n := len(lats); n > 0 {
 				cur.LatencyP50 = pct(lats, 0.5)
 				cur.LatencyP95 = pct(lats, 0.95)
@@ -348,8 +382,31 @@ func runShadowRuntime(ctx context.Context, dur time.Duration, statusAddr string,
 			runtime.ReadMemStats(&ms)
 			cur.PeakMemMB = float64(ms.Alloc) / 1024 / 1024
 			cur.Trades = rt.Metrics.Trades
-			_, drop := bus.Stats()
-			cur.Drops = drop
+			tel := bus.Telemetry()
+			ptel := persist.Telemetry()
+			cur.Drops = tel.Drops
+			cur.BusCapacity = tel.Capacity
+			cur.BusDepth = tel.Depth
+			cur.BusHighWater = tel.HighWater
+			cur.DropsByKind = fmtKind(tel.ByKind)
+			cur.DropsByReason = fmtKind(tel.ByReason)
+			cur.PersistDrops = ptel.Drops
+			cur.PersistDepth = ptel.Depth
+			cur.PersistHighWater = ptel.HighWater
+			if up := ops.AgeSeconds(started); up > 0 {
+				cur.BusEnqPerSec = float64(tel.Sent+tel.Drops) / float64(up)
+				cur.BusDeqPerSec = float64(rt.Metrics.Events) / float64(up)
+			}
+			if bk != nil {
+				cur.ResyncReason = bk.ResyncReason()
+				cur.ResyncLog = bk.ResyncLog()
+			}
+			integ := dataint.Classify(tel.Drops+ptel.Drops, gaps, resyncs, synced)
+			if ptel.Drops > 0 && integ.Reason == "BUS_BACKPRESSURE" {
+				integ.Reason = "PERSIST_BACKPRESSURE"
+			}
+			cur.IntegrityStatus = integ.Status
+			cur.IntegrityReason = integ.Reason
 			if newLegacy != 0 {
 				cur.LastLegacyDir = newLegacy
 				if newLegacy > 0 {
@@ -470,6 +527,20 @@ func dirSizeMB(root string) float64 {
 		return nil
 	})
 	return float64(n) / 1024 / 1024
+}
+
+func fmtKind(m map[string]int64) string {
+	if len(m) == 0 {
+		return ""
+	}
+	out := ""
+	for k, v := range m {
+		if out != "" {
+			out += ","
+		}
+		out += fmt.Sprintf("%s=%d", k, v)
+	}
+	return out
 }
 
 func evidenceLine(ab absorption.Snapshot) string {

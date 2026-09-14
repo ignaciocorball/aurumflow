@@ -18,6 +18,19 @@ func TestSnapshotAndDelta(t *testing.T) {
 	}
 }
 
+func TestResyncReasonSequenceMismatch(t *testing.T) {
+	b := New()
+	b.ApplySnapshot(10, []Level{{1, 1}}, []Level{{2, 1}})
+	_ = b.ApplyFuturesDelta(30, 31, 20, nil, nil)
+	if b.ResyncReason() != "sequence_mismatch" || b.Gaps < 1 {
+		t.Fatalf("reason=%s gaps=%d", b.ResyncReason(), b.Gaps)
+	}
+	b.NoteResync("startup_snapshot")
+	if b.ResyncReason() != "startup_snapshot" {
+		t.Fatal(b.ResyncReason())
+	}
+}
+
 func TestGapResync(t *testing.T) {
 	b := New()
 	b.ApplySnapshot(10, []Level{{1, 1}}, []Level{{2, 1}})

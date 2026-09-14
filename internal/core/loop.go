@@ -93,6 +93,8 @@ type Loop struct {
 	GitCommit        string
 	StrategyVersion  string
 	LastScanAt       time.Time
+	LastEvalAt       time.Time
+	LastM15Completed time.Time
 	LastSignalAt     time.Time
 	LastSignalID     string
 	History          *strathist.Book
@@ -385,6 +387,7 @@ func (l *Loop) tick(ctx context.Context) {
 		return
 	}
 	lastM15 := candlesM15[len(candlesM15)-1].Time
+	l.LastM15Completed = lastM15
 
 	var trendH1 string
 	var lastH1 time.Time
@@ -588,6 +591,8 @@ func (l *Loop) tick(ctx context.Context) {
 		MinPenetration: l.Config.Strategy.SweepMinPenetration,
 		MinWickRatio:   l.Config.Strategy.SweepMinWickRatio,
 	}
+	l.LastEvalAt = now
+	l.LastM15Completed = lastM15
 	in := strategy.BuildComposerInput(
 		candlesM15,
 		lookback,
@@ -1563,6 +1568,16 @@ func atrBucket(atr float64) string {
 }
 
 func (l *Loop) DecisionText() string { return l.lastDecision }
+
+func (l *Loop) ScanReady() bool {
+	d := l.lastDecision
+	if strings.HasPrefix(d, "data_frozen") || strings.HasPrefix(d, "waiting:HISTORY") || strings.HasPrefix(d, "waiting:warmup") {
+		return false
+	}
+	return !l.LastEvalAt.IsZero()
+}
+
+func (l *Loop) LastCompletedM15() time.Time { return l.LastM15Completed }
 
 func (l *Loop) OpenedAt() time.Time { return l.lastOpenedAt }
 

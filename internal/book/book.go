@@ -19,6 +19,8 @@ type Book struct {
 	Resyncs    int
 	Gaps       int
 	Updated    time.Time
+	LastResyncReason string
+	resyncLog  []string
 }
 
 func New() *Book {
@@ -70,14 +72,14 @@ func (b *Book) ApplyFuturesDelta(firstID, finalID, prevFinal int64, bids, asks [
 	if firstID <= b.LastID+1 && b.LastID+1 <= finalID {
 		// first after snapshot
 	} else if prevFinal != 0 && prevFinal != b.LastID {
+		b.noteResyncLocked("sequence_mismatch")
 		b.Synced = false
 		b.Gaps++
-		b.Resyncs++
 		return fmt.Errorf("gap: pu=%d last=%d", prevFinal, b.LastID)
 	} else if prevFinal == 0 && firstID != b.LastID+1 {
+		b.noteResyncLocked("sequence_mismatch")
 		b.Synced = false
 		b.Gaps++
-		b.Resyncs++
 		return fmt.Errorf("gap: U=%d last=%d", firstID, b.LastID)
 	}
 	applyLevels(b.Bids, bids)
@@ -245,15 +247,15 @@ func (b *Book) ApplySeqDelta(seq, prev int64, bids, asks []Level) error {
 		return fmt.Errorf("book not synced")
 	}
 	if prev != 0 && prev != b.LastID {
+		b.noteResyncLocked("sequence_mismatch")
 		b.Synced = false
 		b.Gaps++
-		b.Resyncs++
 		return fmt.Errorf("gap: prev=%d last=%d", prev, b.LastID)
 	}
 	if prev == 0 && seq != b.LastID+1 && b.LastID != 0 {
+		b.noteResyncLocked("sequence_mismatch")
 		b.Synced = false
 		b.Gaps++
-		b.Resyncs++
 		return fmt.Errorf("gap: seq=%d last=%d", seq, b.LastID)
 	}
 	applyLevels(b.Bids, bids)
@@ -286,12 +288,27 @@ func (b *Book) MarkUnsynced() {
 }
 
 func (b *Book) IncResyncs() {
+	b.NoteResync("unspecified")
+}
+
+func (b *Book) NoteResync(reason string) {
 	if b == nil {
 		return
 	}
 	b.mu.Lock()
-	b.Resyncs++
+	b.noteResyncLocked(reason)
 	b.mu.Unlock()
+}
+
+func (b *Book) noteResyncLocked(reason string) {
+	if reason == "" {
+		reason = "unspecified"
+	}
+	b.Resyncs++
+	b.LastResyncReason = reason
+	if len(b.resyncLog) < 8 {
+		b.resyncLog = append(b.resyncLog, reason)
+	}
 }
 
 func (b *Book) Meta() (synced bool, lastID int64, gaps, resyncs int) {
@@ -301,6 +318,31 @@ func (b *Book) Meta() (synced bool, lastID int64, gaps, resyncs int) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.Synced, b.LastID, b.Gaps, b.Resyncs
+}
+
+func (b *Book) ResyncReason() string {
+	if b == nil {
+		return ""
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.LastResyncReason
+}
+
+func (b *Book) ResyncLog() string {
+	if b == nil {
+		return ""
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	out := ""
+	for i, r := range b.resyncLog {
+		if i > 0 {
+			out += ","
+		}
+		out += r
+	}
+	return out
 }
 
 func copyTopMap(m map[float64]float64, n int, highFirst bool) map[float64]float64 {

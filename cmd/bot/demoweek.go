@@ -315,6 +315,15 @@ func runDemoWeek(ctx context.Context, epic string, statusAddr string) {
 				cur.MonetaryReady = cached.ValidationStatus == money.RuntimeValidated
 				cur.RiskReady = !ks.HaltNewOrders()
 				cur.StrategyReady = cur.BrokerReady && cur.AccountReady && cur.MonetaryReady && cur.HistoryReady && sessv.Eligible && cur.RiskReady
+				cur.ScanReady = cur.StrategyReady && loop.ScanReady()
+				cur.LiveDataFresh = !strings.HasPrefix(loop.DecisionText(), "data_frozen")
+				if t := loop.LastCompletedM15(); !t.IsZero() {
+					cur.LastCompletedM15 = t.UTC().Format(time.RFC3339)
+					cur.M15AgeMinutes = time.Since(t).Minutes()
+				}
+				if !cur.ScanReady {
+					cur.ScanBlockReason = loop.DecisionText()
+				}
 				if !loop.LastScanAt.IsZero() {
 					cur.LastScan = loop.LastScanAt.UTC().Format(time.RFC3339)
 				}

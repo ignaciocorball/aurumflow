@@ -110,6 +110,8 @@ type MarketState struct {
 	FeatLegacy         string
 	TapeState          string
 	QuoteHealth        string
+	Salience           float64
+	SalienceReason     string
 }
 
 type WorldState struct {

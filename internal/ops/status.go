@@ -156,6 +156,28 @@ type Status struct {
 	MonetaryReady     bool        `json:"monetary_ready"`
 	HistoryReady      bool        `json:"history_ready"`
 	RiskReady         bool        `json:"risk_ready"`
+	ScanReady         bool        `json:"scan_ready"`
+	LiveDataFresh     bool        `json:"live_data_fresh"`
+	LastCompletedM15  string      `json:"last_completed_m15"`
+	M15AgeMinutes     float64     `json:"m15_age_minutes"`
+	ScanBlockReason   string      `json:"scan_block_reason"`
+	BusCapacity       int         `json:"bus_capacity"`
+	BusDepth          int         `json:"bus_depth"`
+	BusHighWater      int64       `json:"bus_high_water"`
+	DropsByKind       string      `json:"drops_by_kind"`
+	DropsByReason     string      `json:"drops_by_reason"`
+	IntegrityStatus   string      `json:"integrity_status"`
+	IntegrityReason   string      `json:"integrity_reason"`
+	PersistDrops      int64       `json:"persist_drops"`
+	PersistDepth      int         `json:"persist_depth"`
+	PersistHighWater  int64       `json:"persist_high_water"`
+	BusEnqPerSec      float64     `json:"bus_enq_per_sec"`
+	BusDeqPerSec      float64     `json:"bus_deq_per_sec"`
+	ConsumerP50Ms     float64     `json:"consumer_p50_ms"`
+	ConsumerP95Ms     float64     `json:"consumer_p95_ms"`
+	ConsumerMaxMs     float64     `json:"consumer_max_ms"`
+	ResyncReason      string      `json:"resync_reason"`
+	ResyncLog         string      `json:"resync_log"`
 }
 
 func NewStatus() Status {

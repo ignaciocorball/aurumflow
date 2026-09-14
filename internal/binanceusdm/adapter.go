@@ -191,7 +191,7 @@ func (a *Adapter) runREST(ctx context.Context, out *md.Bus) {
 			if synced, _, _, _ := a.Book.Meta(); !synced {
 				if snap, err := a.FetchSnapshot(ctx); err == nil {
 					a.applySnapshot(snap)
-					a.Book.IncResyncs()
+					a.Book.NoteResync("rest_unsynced")
 					out.Publish(ctx, md.Event{
 						Kind: md.KindBookSnapshot, EventTime: time.Now().UTC(), ReceiveTime: time.Now().UTC(),
 						Provider: a.Name(), Venue: "binance_usdm", Instrument: a.Symbol, Seq: snap.LastUpdateID,
@@ -246,7 +246,7 @@ func (a *Adapter) applyBuffered(snapID int64) {
 		if !started {
 			if !FirstApplicable(snapID, ev.FirstID, ev.FinalID) {
 				a.Book.MarkUnsynced()
-				a.Book.IncResyncs()
+				a.Book.NoteResync("buffered_not_applicable")
 				return
 			}
 			started = true
